@@ -1,0 +1,48 @@
+[project]
+name = "autofarm-success-guru"
+version = "6.0.0"
+description = "AutoFarm Zero — Success Guru Network v6.0. Autonomous content creation and multi-account publishing network on OCI Free Tier."
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+
+dependencies = [
+    # Core
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "cryptography>=42.0",
+    "schedule>=1.2",
+    "psutil>=5.9",
+
+    # Database
+    "sqlite-utils>=3.36",
+
+    # AI/ML
+    "kokoro>=0.9.4",
+    "soundfile>=0.12",
+    "scikit-learn>=1.4",
+
+    # Telegram (primary review)
+    "python-telegram-bot>=20.7",
+
+    # Google Drive (optional fallback)
+    "google-auth>=2.27",
+    "google-auth-oauthlib>=1.2",
+    "google-auth-httplib2>=0.2",
+    "google-api-python-client>=2.120",
+
+    # Logging
+    "structlog>=24.1",
+
+    # Image processing
+    "Pillow>=10.2",
+
+    # OCI SDK
+    "oci>=2.120",
+]
+
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["modules*", "database*", "account_manager*", "config*", "jobs*", "scripts*"]

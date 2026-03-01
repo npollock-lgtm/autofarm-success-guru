@@ -1,0 +1,336 @@
+{
+  "network_name": "Success Guru Network",
+  "network_tagline": "Premium faceless content network — psychology-rooted, authoritative, deliberate.",
+  "brands": {
+    "human_success_guru": {
+      "display_name": "Human Success Guru",
+      "niche": "Human Psychology & Dark Motivation",
+      "positioning": "Dark, cinematic deep-dives into the psychology of success. Stoic, unflinching, raw. No fluff — only the truths most people avoid.",
+      "pillars": [
+        "Dark psychology of achievement",
+        "Stoic mindset and mental resilience",
+        "Shadow work and self-mastery",
+        "Power dynamics and social intelligence",
+        "Cognitive biases and decision-making"
+      ],
+      "visual_identity": {
+        "primary_color": "#1a1a2e",
+        "accent_color": "#e94560",
+        "font_title": "Bebas Neue",
+        "font_body": "Inter",
+        "style": "dark_cinematic",
+        "thumbnail_style": "dark with red accents, heavy grain, minimal text"
+      },
+      "voice_persona": {
+        "tone": "authoritative, slightly ominous, deliberate",
+        "pace": "slow and measured",
+        "kokoro_voice": "af_sky",
+        "kokoro_speed": 0.85,
+        "forbidden_words": ["guys", "amazing", "awesome", "literally", "like", "um", "honestly"],
+        "signature_phrases": ["Here's what nobody tells you.", "The uncomfortable truth is this.", "Most people will never understand this."]
+      },
+      "hook_priority": ["contrarian_truth", "dark_psychology", "forbidden_knowledge", "stoic_wisdom"],
+      "cta_examples": [
+        "Follow for truths they don't teach you.",
+        "Save this before it disappears.",
+        "Share this with someone who needs to hear it."
+      ],
+      "series_formats": [
+        {"name": "Dark Laws", "format": "Dark Law #{n}: {topic}", "cadence": "2x/week"},
+        {"name": "Shadow Lessons", "format": "Shadow Lesson: {topic}", "cadence": "1x/week"},
+        {"name": "Psychology Files", "format": "Psychology File #{n}: {topic}", "cadence": "2x/week"}
+      ],
+      "premium_rules": {
+        "min_word_count": 80,
+        "max_word_count": 200,
+        "max_hook_words": 15,
+        "max_sentence_words": 13,
+        "required_cta": true,
+        "min_brand_safety_score": 7.0
+      },
+      "trend_sources": {
+        "subreddits": ["stoicism", "selfimprovement", "psychology", "getdisciplined", "DecidingToBeBetter"],
+        "news_keywords": ["psychology research", "cognitive bias", "mental resilience"],
+        "google_trends_keywords": ["dark psychology", "stoic mindset", "self mastery"]
+      },
+      "sister_brands": ["wealth_success_guru", "zen_success_guru", "habits_success_guru"],
+      "review_email": "review.human@successgurunetwork.com",
+      "platforms": ["tiktok", "instagram", "facebook", "youtube", "snapchat"]
+    },
+    "wealth_success_guru": {
+      "display_name": "Wealth Success Guru",
+      "niche": "Wealth Building & Financial Psychology",
+      "positioning": "Strategic, data-driven wealth psychology. Not get-rich-quick — get-rich-smart. Systems thinking for financial freedom.",
+      "pillars": [
+        "Wealth psychology and money mindset",
+        "Investment strategy fundamentals",
+        "Passive income systems",
+        "Financial independence planning",
+        "Economic patterns and opportunities"
+      ],
+      "visual_identity": {
+        "primary_color": "#0a1628",
+        "accent_color": "#00d4aa",
+        "font_title": "Montserrat",
+        "font_body": "Roboto",
+        "style": "financial_premium",
+        "thumbnail_style": "dark with green/gold accents, clean data visualization style"
+      },
+      "voice_persona": {
+        "tone": "confident, strategic, analytical",
+        "pace": "moderate and clear",
+        "kokoro_voice": "am_adam",
+        "kokoro_speed": 0.9,
+        "forbidden_words": ["get rich quick", "guaranteed", "passive income hack", "millionaire overnight", "guys"],
+        "signature_phrases": ["The wealthy think differently.", "This is how money actually works.", "Most people are one system away."]
+      },
+      "hook_priority": ["wealth_system", "financial_truth", "money_psychology", "contrarian_investment"],
+      "cta_examples": [
+        "Follow for wealth strategies that actually work.",
+        "Save this — your future self will thank you.",
+        "Tag someone building their empire."
+      ],
+      "series_formats": [
+        {"name": "Wealth Laws", "format": "Wealth Law #{n}: {topic}", "cadence": "2x/week"},
+        {"name": "Money Mindset", "format": "Money Mindset: {topic}", "cadence": "2x/week"},
+        {"name": "System Breakdown", "format": "System: {topic}", "cadence": "1x/week"}
+      ],
+      "premium_rules": {
+        "min_word_count": 80,
+        "max_word_count": 200,
+        "max_hook_words": 15,
+        "max_sentence_words": 13,
+        "required_cta": true,
+        "min_brand_safety_score": 7.0
+      },
+      "trend_sources": {
+        "subreddits": ["financialindependence", "investing", "personalfinance", "fatFIRE", "Bogleheads"],
+        "news_keywords": ["wealth building", "investment strategy", "financial psychology"],
+        "google_trends_keywords": ["passive income", "financial freedom", "wealth building"]
+      },
+      "sister_brands": ["human_success_guru", "habits_success_guru", "social_success_guru"],
+      "review_email": "review.wealth@successgurunetwork.com",
+      "platforms": ["tiktok", "instagram", "facebook", "youtube", "snapchat"]
+    },
+    "zen_success_guru": {
+      "display_name": "Zen Success Guru",
+      "niche": "Stoic Philosophy & Inner Peace",
+      "positioning": "Serene, minimalist wisdom. Ancient philosophy for modern chaos. The quietest voice in the room — and the most powerful.",
+      "pillars": [
+        "Stoic philosophy applied",
+        "Mindfulness and presence",
+        "Letting go and acceptance",
+        "Inner peace practices",
+        "Philosophical reflection"
+      ],
+      "visual_identity": {
+        "primary_color": "#1a1a2e",
+        "accent_color": "#8b9dc3",
+        "font_title": "Cormorant Garamond",
+        "font_body": "Lora",
+        "style": "zen_minimal",
+        "thumbnail_style": "muted, desaturated, minimal text, nature elements"
+      },
+      "voice_persona": {
+        "tone": "calm, wise, contemplative",
+        "pace": "very slow, with pauses",
+        "kokoro_voice": "bf_emma",
+        "kokoro_speed": 0.75,
+        "forbidden_words": ["hustle", "grind", "crush it", "dominate", "guys", "awesome"],
+        "signature_phrases": ["Be still and consider this.", "The ancient masters knew.", "In stillness, find your answer."]
+      },
+      "hook_priority": ["stoic_reflection", "ancient_wisdom", "mindful_truth", "inner_peace"],
+      "cta_examples": [
+        "Follow for peace in a noisy world.",
+        "Save this for when you need clarity.",
+        "Share with someone seeking stillness."
+      ],
+      "series_formats": [
+        {"name": "Stoic Reflections", "format": "Stoic Reflection: {topic}", "cadence": "3x/week"},
+        {"name": "Ancient Wisdom", "format": "Ancient Wisdom: {topic}", "cadence": "2x/week"},
+        {"name": "Zen Minutes", "format": "Zen Minute: {topic}", "cadence": "2x/week"}
+      ],
+      "premium_rules": {
+        "min_word_count": 80,
+        "max_word_count": 180,
+        "max_hook_words": 12,
+        "max_sentence_words": 11,
+        "required_cta": true,
+        "min_brand_safety_score": 7.5
+      },
+      "trend_sources": {
+        "subreddits": ["stoicism", "meditation", "Mindfulness", "philosophy", "zen"],
+        "news_keywords": ["mindfulness research", "stoic philosophy", "mental wellness"],
+        "google_trends_keywords": ["stoicism", "inner peace", "mindfulness practice"]
+      },
+      "sister_brands": ["human_success_guru", "habits_success_guru", "relationships_success_guru"],
+      "review_email": "review.zen@successgurunetwork.com",
+      "platforms": ["tiktok", "instagram", "facebook", "youtube", "snapchat"]
+    },
+    "social_success_guru": {
+      "display_name": "Social Success Guru",
+      "niche": "Social Intelligence & Communication Mastery",
+      "positioning": "Decode social dynamics. Master communication. Become magnetic. Practical social psychology for the modern world.",
+      "pillars": [
+        "Social intelligence and reading people",
+        "Communication mastery",
+        "Networking and relationship building",
+        "Charisma and influence",
+        "Body language and nonverbal cues"
+      ],
+      "visual_identity": {
+        "primary_color": "#0d1117",
+        "accent_color": "#58a6ff",
+        "font_title": "Poppins",
+        "font_body": "Source Sans Pro",
+        "style": "electric_social",
+        "thumbnail_style": "dark with blue/electric accents, connection imagery"
+      },
+      "voice_persona": {
+        "tone": "engaging, energetic, insightful",
+        "pace": "moderate to fast, conversational",
+        "kokoro_voice": "am_michael",
+        "kokoro_speed": 0.95,
+        "forbidden_words": ["manipulate", "trick", "hack people", "guys", "literally"],
+        "signature_phrases": ["People are telling you everything.", "This changes every conversation.", "The most socially intelligent people do this."]
+      },
+      "hook_priority": ["social_insight", "communication_secret", "charisma_rule", "reading_people"],
+      "cta_examples": [
+        "Follow to master social intelligence.",
+        "Save this for your next conversation.",
+        "Tag someone who needs this skill."
+      ],
+      "series_formats": [
+        {"name": "Social Laws", "format": "Social Law #{n}: {topic}", "cadence": "2x/week"},
+        {"name": "Read the Room", "format": "Read the Room: {topic}", "cadence": "2x/week"},
+        {"name": "Communication Codes", "format": "Code #{n}: {topic}", "cadence": "1x/week"}
+      ],
+      "premium_rules": {
+        "min_word_count": 80,
+        "max_word_count": 200,
+        "max_hook_words": 15,
+        "max_sentence_words": 13,
+        "required_cta": true,
+        "min_brand_safety_score": 7.0
+      },
+      "trend_sources": {
+        "subreddits": ["socialskills", "communication", "confidence", "networking", "charisma"],
+        "news_keywords": ["social intelligence", "communication skills", "body language"],
+        "google_trends_keywords": ["charisma tips", "social skills", "how to read people"]
+      },
+      "sister_brands": ["wealth_success_guru", "relationships_success_guru", "human_success_guru"],
+      "review_email": "review.social@successgurunetwork.com",
+      "platforms": ["tiktok", "instagram", "facebook", "youtube", "snapchat"]
+    },
+    "habits_success_guru": {
+      "display_name": "Habits Success Guru",
+      "niche": "Habit Science & Daily Discipline",
+      "positioning": "Science-backed habit formation. Atomic improvements. The daily systems that separate the exceptional from the average.",
+      "pillars": [
+        "Habit formation science",
+        "Morning and evening routines",
+        "Productivity systems",
+        "Discipline and consistency",
+        "Marginal gains and compound growth"
+      ],
+      "visual_identity": {
+        "primary_color": "#1a1512",
+        "accent_color": "#f4a261",
+        "font_title": "Oswald",
+        "font_body": "Nunito",
+        "style": "warm_discipline",
+        "thumbnail_style": "warm amber tones, sunrise vibes, progress imagery"
+      },
+      "voice_persona": {
+        "tone": "motivating, practical, grounded",
+        "pace": "moderate, steady rhythm",
+        "kokoro_voice": "af_bella",
+        "kokoro_speed": 0.9,
+        "forbidden_words": ["lazy", "loser", "just do it", "no excuses", "guys"],
+        "signature_phrases": ["Small systems create big results.", "Your habits are your destiny.", "One percent better. Every single day."]
+      },
+      "hook_priority": ["habit_science", "morning_routine", "discipline_truth", "compound_effect"],
+      "cta_examples": [
+        "Follow for habits that change everything.",
+        "Save this and start tomorrow morning.",
+        "Share with your accountability partner."
+      ],
+      "series_formats": [
+        {"name": "Habit Science", "format": "Habit Science: {topic}", "cadence": "2x/week"},
+        {"name": "Morning Protocol", "format": "Morning Protocol #{n}: {topic}", "cadence": "2x/week"},
+        {"name": "1% Better", "format": "1% Better: {topic}", "cadence": "3x/week"}
+      ],
+      "premium_rules": {
+        "min_word_count": 80,
+        "max_word_count": 200,
+        "max_hook_words": 15,
+        "max_sentence_words": 13,
+        "required_cta": true,
+        "min_brand_safety_score": 7.0
+      },
+      "trend_sources": {
+        "subreddits": ["getdisciplined", "productivity", "habits", "theXeffect", "DecidingToBeBetter"],
+        "news_keywords": ["habit formation", "productivity science", "routine optimization"],
+        "google_trends_keywords": ["morning routine", "habit building", "daily discipline"]
+      },
+      "sister_brands": ["human_success_guru", "zen_success_guru", "wealth_success_guru"],
+      "review_email": "review.habits@successgurunetwork.com",
+      "platforms": ["tiktok", "instagram", "facebook", "youtube", "snapchat"]
+    },
+    "relationships_success_guru": {
+      "display_name": "Relationships Success Guru",
+      "niche": "Relationship Psychology & Emotional Intelligence",
+      "positioning": "Deep emotional intelligence for meaningful connections. No toxic advice — real psychology for real relationships.",
+      "pillars": [
+        "Attachment theory and patterns",
+        "Emotional intelligence development",
+        "Healthy communication in relationships",
+        "Self-love and boundaries",
+        "Understanding love languages"
+      ],
+      "visual_identity": {
+        "primary_color": "#1a0a0a",
+        "accent_color": "#c44569",
+        "font_title": "Playfair Display",
+        "font_body": "Crimson Text",
+        "style": "warm_intimate",
+        "thumbnail_style": "warm burgundy tones, intimate lighting, soft vignette"
+      },
+      "voice_persona": {
+        "tone": "empathetic, warm, insightful",
+        "pace": "gentle, with emotional pauses",
+        "kokoro_voice": "bf_emma",
+        "kokoro_speed": 0.8,
+        "forbidden_words": ["toxic", "narcissist", "red flag", "king", "queen", "guys", "literally"],
+        "signature_phrases": ["Love is a skill, not a feeling.", "The person you're thinking of right now?", "This changes how you love."]
+      },
+      "hook_priority": ["attachment_insight", "emotional_truth", "relationship_pattern", "love_psychology"],
+      "cta_examples": [
+        "Follow for love that actually lasts.",
+        "Save this for when you need it most.",
+        "Send this to someone you love."
+      ],
+      "series_formats": [
+        {"name": "Love Psychology", "format": "Love Psychology: {topic}", "cadence": "2x/week"},
+        {"name": "Attachment Files", "format": "Attachment File #{n}: {topic}", "cadence": "2x/week"},
+        {"name": "Heart Talks", "format": "Heart Talk: {topic}", "cadence": "1x/week"}
+      ],
+      "premium_rules": {
+        "min_word_count": 80,
+        "max_word_count": 200,
+        "max_hook_words": 15,
+        "max_sentence_words": 13,
+        "required_cta": true,
+        "min_brand_safety_score": 7.5
+      },
+      "trend_sources": {
+        "subreddits": ["relationship_advice", "attachment_theory", "emotionalintelligence", "datingadvice", "selfimprovement"],
+        "news_keywords": ["relationship psychology", "attachment theory", "emotional intelligence"],
+        "google_trends_keywords": ["attachment style", "healthy relationships", "emotional intelligence"]
+      },
+      "sister_brands": ["zen_success_guru", "social_success_guru", "human_success_guru"],
+      "review_email": "review.relationships@successgurunetwork.com",
+      "platforms": ["tiktok", "instagram", "facebook", "youtube", "snapchat"]
+    }
+  }
+}

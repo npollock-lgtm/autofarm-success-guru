@@ -1,0 +1,19 @@
+[project]
+name = "autofarm-proxy"
+version = "6.0.0"
+description = "AutoFarm Zero — Proxy VM components. Squid proxy management, approval server, and Telegram review bot."
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+
+dependencies = [
+    "flask>=3.0",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "cryptography>=42.0",
+    "python-telegram-bot>=20.7",
+    "structlog>=24.1",
+]
+
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"

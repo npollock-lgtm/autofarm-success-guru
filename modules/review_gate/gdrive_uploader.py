@@ -1,0 +1,393 @@
+"""
+Google Drive Video Uploader — **OPTIONAL** fallback for email-based reviews.
+
+Only active when ``GDRIVE_ENABLED=true``.  Uploads videos and thumbnails to
+Google Drive for full-quality review access.
+
+Storage management:
+  * Free tier: 15 GB
+  * Alert at 12 GB (80 %)
+  * Force cleanup at 13.5 GB (90 %)
+  * Files auto-expire after ``GDRIVE_FILE_EXPIRY_DAYS`` (default 14)
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger("autofarm.review_gate.gdrive_uploader")
+
+DEFAULT_EXPIRY_DAYS = 14
+ALERT_THRESHOLD_GB = 12.0
+CRITICAL_THRESHOLD_GB = 13.5
+TOTAL_STORAGE_GB = 15.0
+
+
+class GDriveVideoUploader:
+    """Upload and manage review videos on Google Drive.
+
+    Parameters
+    ----------
+    db:
+        Database helper instance.
+    credentials_path:
+        Path to ``gdrive_credentials.json``.
+    token_path:
+        Path to ``gdrive_token.json``.
+    review_folder:
+        Google Drive folder name for uploads.
+    expiry_days:
+        Auto-delete files after this many days.
+    """
+
+    def __init__(
+        self,
+        db: Any,
+        credentials_path: Optional[str] = None,
+        token_path: Optional[str] = None,
+        review_folder: str = "AutoFarm Reviews",
+        expiry_days: int = DEFAULT_EXPIRY_DAYS,
+    ) -> None:
+        self.db = db
+        self.credentials_path = credentials_path or os.getenv(
+            "GDRIVE_CREDENTIALS_PATH", "config/gdrive_credentials.json"
+        )
+        self.token_path = token_path or os.getenv(
+            "GDRIVE_TOKEN_PATH", "config/gdrive_token.json"
+        )
+        self.review_folder = review_folder or os.getenv(
+            "GDRIVE_REVIEW_FOLDER", "AutoFarm Reviews"
+        )
+        self.expiry_days = int(
+            os.getenv("GDRIVE_FILE_EXPIRY_DAYS", str(expiry_days))
+        )
+        self._service: Any = None
+        self._folder_id: Optional[str] = None
+
+    # ------------------------------------------------------------------
+    # Authentication
+    # ------------------------------------------------------------------
+
+    def _get_service(self) -> Any:
+        """Authenticate and return a Google Drive API service.
+
+        Returns
+        -------
+        googleapiclient.discovery.Resource
+            Authenticated Drive v3 service.
+
+        Raises
+        ------
+        RuntimeError
+            If authentication fails or dependencies missing.
+        """
+        if self._service is not None:
+            return self._service
+
+        try:
+            from google.oauth2.credentials import Credentials
+            from google_auth_oauthlib.flow import InstalledAppFlow
+            from google.auth.transport.requests import Request
+            from googleapiclient.discovery import build
+            import pickle
+
+            SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+            creds = None
+
+            if os.path.exists(self.token_path):
+                with open(self.token_path, "rb") as f:
+                    creds = pickle.load(f)
+
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    creds.refresh(Request())
+                else:
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        self.credentials_path, SCOPES
+                    )
+                    creds = flow.run_local_server(port=0)
+                with open(self.token_path, "wb") as f:
+                    pickle.dump(creds, f)
+
+            self._service = build("drive", "v3", credentials=creds)
+            return self._service
+        except ImportError as exc:
+            raise RuntimeError(f"Google Drive dependencies not installed: {exc}")
+
+    def _get_folder_id(self) -> str:
+        """Get or create the review folder in Google Drive.
+
+        Returns
+        -------
+        str
+            Folder ID.
+        """
+        if self._folder_id:
+            return self._folder_id
+
+        service = self._get_service()
+        results = (
+            service.files()
+            .list(
+                q=(
+                    f"name='{self.review_folder}' "
+                    "and mimeType='application/vnd.google-apps.folder' "
+                    "and trashed=false"
+                ),
+                spaces="drive",
+                fields="files(id, name)",
+            )
+            .execute()
+        )
+        files = results.get("files", [])
+        if files:
+            self._folder_id = files[0]["id"]
+            return self._folder_id
+
+        metadata = {
+            "name": self.review_folder,
+            "mimeType": "application/vnd.google-apps.folder",
+        }
+        folder = (
+            service.files().create(body=metadata, fields="id").execute()
+        )
+        self._folder_id = folder.get("id", "")
+        return self._folder_id
+
+    # ------------------------------------------------------------------
+    # Upload operations
+    # ------------------------------------------------------------------
+
+    async def upload_video(
+        self, video_path: str, review_token: str, brand_id: str
+    ) -> Tuple[str, str]:
+        """Upload a video to Google Drive.
+
+        Parameters
+        ----------
+        video_path:
+            Path to the video file.
+        review_token:
+            Review token (used as filename prefix).
+        brand_id:
+            Brand identifier.
+
+        Returns
+        -------
+        Tuple[str, str]
+            ``(file_id, preview_url)``.
+
+        Side Effects
+        ------------
+        * Uploads file to Google Drive.
+        * Sets anyone-with-link viewer permission.
+        * Records in ``gdrive_review_files`` table.
+        """
+        service = self._get_service()
+        folder_id = self._get_folder_id()
+
+        from googleapiclient.http import MediaFileUpload
+
+        filename = f"{brand_id}_{review_token[:8]}.mp4"
+        file_metadata = {"name": filename, "parents": [folder_id]}
+        media = MediaFileUpload(
+            video_path, mimetype="video/mp4", resumable=True
+        )
+        uploaded = (
+            service.files()
+            .create(
+                body=file_metadata,
+                media_body=media,
+                fields="id,webViewLink",
+            )
+            .execute()
+        )
+        file_id = uploaded.get("id", "")
+        preview_url = uploaded.get("webViewLink", "")
+
+        # Make link-shareable
+        service.permissions().create(
+            fileId=file_id,
+            body={"type": "anyone", "role": "reader"},
+        ).execute()
+
+        await self.db.execute(
+            """
+            INSERT INTO gdrive_review_files
+                (file_id, review_token, brand_id, file_type, preview_url)
+            VALUES (?, ?, ?, 'video', ?)
+            """,
+            (file_id, review_token, brand_id, preview_url),
+        )
+        logger.info("Uploaded video to Drive: %s (%s)", filename, file_id)
+        return (file_id, preview_url)
+
+    async def upload_thumbnail(
+        self, thumbnail_path: str, review_token: str
+    ) -> str:
+        """Upload a thumbnail image to Google Drive.
+
+        Parameters
+        ----------
+        thumbnail_path:
+            Path to the thumbnail image.
+        review_token:
+            Review token.
+
+        Returns
+        -------
+        str
+            Google Drive file ID.
+        """
+        service = self._get_service()
+        folder_id = self._get_folder_id()
+
+        from googleapiclient.http import MediaFileUpload
+
+        ext = Path(thumbnail_path).suffix
+        filename = f"thumb_{review_token[:8]}{ext}"
+        file_metadata = {"name": filename, "parents": [folder_id]}
+        mime = f"image/{ext.lstrip('.')}" if ext else "image/jpeg"
+        media = MediaFileUpload(thumbnail_path, mimetype=mime)
+        uploaded = (
+            service.files()
+            .create(body=file_metadata, media_body=media, fields="id")
+            .execute()
+        )
+        file_id = uploaded.get("id", "")
+        logger.info("Uploaded thumbnail to Drive: %s (%s)", filename, file_id)
+        return file_id
+
+    # ------------------------------------------------------------------
+    # Storage management
+    # ------------------------------------------------------------------
+
+    def get_storage_usage_gb(self) -> float:
+        """Return current Google Drive storage usage in GB.
+
+        Returns
+        -------
+        float
+            Storage used in GB.
+        """
+        try:
+            service = self._get_service()
+            about = service.about().get(fields="storageQuota").execute()
+            usage_bytes = int(about.get("storageQuota", {}).get("usage", 0))
+            return round(usage_bytes / (1024 ** 3), 2)
+        except Exception as exc:
+            logger.error("Failed to get Drive storage: %s", exc)
+            return 0.0
+
+    async def cleanup_expired_reviews(self) -> int:
+        """Delete files older than ``expiry_days``.
+
+        Returns
+        -------
+        int
+            Number of files deleted.
+
+        Side Effects
+        ------------
+        Deletes remote files and marks DB rows as deleted.
+        """
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=self.expiry_days)
+        ).isoformat()
+
+        rows = await self.db.fetch_all(
+            """
+            SELECT id, file_id FROM gdrive_review_files
+            WHERE deleted = 0 AND uploaded_at < ?
+            """,
+            (cutoff,),
+        )
+
+        deleted = 0
+        for row in rows:
+            if await self.delete_file(row["file_id"]):
+                await self.db.execute(
+                    "UPDATE gdrive_review_files SET deleted = 1 WHERE id = ?",
+                    (row["id"],),
+                )
+                deleted += 1
+
+        if deleted:
+            logger.info("Cleaned up %d expired Drive files", deleted)
+        return deleted
+
+    async def delete_file(self, file_id: str) -> bool:
+        """Delete a single file from Google Drive.
+
+        Parameters
+        ----------
+        file_id:
+            Google Drive file ID.
+
+        Returns
+        -------
+        bool
+            ``True`` on success.
+        """
+        try:
+            service = self._get_service()
+            service.files().delete(fileId=file_id).execute()
+            logger.info("Deleted Drive file: %s", file_id)
+            return True
+        except Exception as exc:
+            logger.warning("Delete failed for %s: %s", file_id, exc)
+            return False
+
+    async def set_file_expiry(self, file_id: str, days: int) -> None:
+        """Tag a file with expiry metadata.
+
+        Parameters
+        ----------
+        file_id:
+            Google Drive file ID.
+        days:
+            Days until expiry.
+        """
+        try:
+            service = self._get_service()
+            expiry = (
+                datetime.now(timezone.utc) + timedelta(days=days)
+            ).isoformat()
+            service.files().update(
+                fileId=file_id,
+                body={"description": f"AutoFarm review — expires {expiry}"},
+            ).execute()
+        except Exception as exc:
+            logger.warning("Set expiry failed: %s", exc)
+
+    async def check_storage_health(self) -> Dict[str, Any]:
+        """Check storage usage and return a health report.
+
+        Returns
+        -------
+        Dict[str, Any]
+            Health report with usage_gb, percent, status, alert.
+        """
+        usage = self.get_storage_usage_gb()
+        percent = round((usage / TOTAL_STORAGE_GB) * 100, 1)
+
+        if usage >= CRITICAL_THRESHOLD_GB:
+            status = "critical"
+            alert = f"Drive storage critical: {usage:.1f}/{TOTAL_STORAGE_GB} GB"
+        elif usage >= ALERT_THRESHOLD_GB:
+            status = "warning"
+            alert = f"Drive storage high: {usage:.1f}/{TOTAL_STORAGE_GB} GB"
+        else:
+            status, alert = "ok", ""
+
+        return {
+            "usage_gb": usage,
+            "total_gb": TOTAL_STORAGE_GB,
+            "percent": percent,
+            "status": status,
+            "alert": alert,
+        }

@@ -1,0 +1,18 @@
+{
+  "youtube_projects": {
+    "_default": {
+      "project_id": "autofarm-success-guru-yt",
+      "quota_units_per_day": 10000,
+      "max_uploads_per_day": 6,
+      "notes": "Single project for all brands. Split only if quota insufficient."
+    }
+  },
+  "brand_assignment": {
+    "human_success_guru": "_default",
+    "wealth_success_guru": "_default",
+    "zen_success_guru": "_default",
+    "social_success_guru": "_default",
+    "habits_success_guru": "_default",
+    "relationships_success_guru": "_default"
+  }
+}

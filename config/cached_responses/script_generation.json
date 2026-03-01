@@ -1,0 +1,85 @@
+{
+  "_description": "Emergency fallback script templates when both Ollama and Groq are unavailable. Each brand has pre-written scripts covering core pillar topics. Used by LLMRouter cached fallback.",
+  "human_success_guru": [
+    {
+      "hook": "The most dangerous skill nobody teaches you.",
+      "body": "Self-awareness is the single most powerful tool you will ever possess. Most people walk through life on autopilot, reacting to emotions they never learned to name. They make decisions driven by fear they refuse to acknowledge. The ancient Stoics understood this. Marcus Aurelius wrote in his private journal every single night. Not for an audience. For himself. He dissected his own thoughts, his own weaknesses, his own patterns. That practice of brutal self-examination is what separated him from every other ruler of his time. You do not need to be an emperor. You need to be honest. Start tonight. Write down the one thing you avoided today and why. That single act of confrontation will change everything.",
+      "cta": "Follow for truths they don't teach you.",
+      "hook_type": "contrarian_truth",
+      "pillar": "Shadow work and self-mastery"
+    },
+    {
+      "hook": "Why the smartest people in the room stay quiet.",
+      "body": "There is a pattern among truly intelligent people that most never notice. They listen more than they speak. Not because they have nothing to say. Because they understand something fundamental about power. Every word you speak gives information away. Every silence forces others to fill the gap, to reveal themselves. Robert Greene called it the law of saying less than necessary. The Stoics called it disciplined restraint. In every meeting, every negotiation, every conversation, the person who controls the silence controls the room. Practice this tomorrow. In your next interaction, wait three seconds longer before responding. Watch how the dynamic shifts.",
+      "cta": "Save this before it disappears.",
+      "hook_type": "dark_psychology",
+      "pillar": "Power dynamics and social intelligence"
+    },
+    {
+      "hook": "Your brain is lying to you right now.",
+      "body": "Confirmation bias is not just a concept in a psychology textbook. It is running your entire life. Right now, your brain is filtering every piece of information you encounter to confirm what you already believe. The uncomfortable truth is that your opinions, your worldview, your identity are all products of a filter you never chose to install. Daniel Kahneman spent decades proving that even experts fall for this. The only defence is active disconfirmation. Deliberately seek out evidence that contradicts your strongest beliefs. The beliefs that survive that test are the ones worth keeping.",
+      "cta": "Share this with someone who needs to hear it.",
+      "hook_type": "forbidden_knowledge",
+      "pillar": "Cognitive biases and decision-making"
+    }
+  ],
+  "wealth_success_guru": [
+    {
+      "hook": "The wealth equation nobody explains.",
+      "body": "Wealth is not income. This is the single most important financial distinction you will ever learn. Income is what you earn. Wealth is what you keep, invest, and compound over time. A person earning fifty thousand a year who saves and invests thirty percent will outpace someone earning two hundred thousand who spends everything. The wealthy understand that money is a tool with a specific function: to generate more money without your direct involvement. Every pound you save has the potential to work for you for the rest of your life. Start by tracking every expense for thirty days. Not to restrict yourself. To understand where your money actually goes.",
+      "cta": "Follow for wealth strategies that actually work.",
+      "hook_type": "wealth_system",
+      "pillar": "Wealth psychology and money mindset"
+    },
+    {
+      "hook": "Rich people do not budget. They do this instead.",
+      "body": "The conventional wisdom about budgeting has it backwards. The wealthy do not restrict spending. They optimise income streams. There is a fundamental psychological difference between a scarcity mindset that counts pennies and an abundance mindset that builds systems. Warren Buffett does not clip coupons. He builds cash-flowing assets. The shift happens when you stop asking how can I spend less and start asking how can I earn more from what I already have. Your savings account earning half a percent is not a strategy. It is a parking lot. Move your money into index funds, dividend stocks, or income-generating assets that work while you sleep.",
+      "cta": "Save this — your future self will thank you.",
+      "hook_type": "financial_truth",
+      "pillar": "Investment strategy fundamentals"
+    }
+  ],
+  "zen_success_guru": [
+    {
+      "hook": "The ancient masters had one rule for peace.",
+      "body": "Accept what is. This is not passive resignation. It is the most powerful stance a human being can take. When you stop fighting reality, something extraordinary happens. Your energy, previously consumed by resistance, becomes available for action. Marcus Aurelius wrote that the impediment to action advances action. What stands in the way becomes the way. Every moment of suffering you experience right now has a single source. The gap between what is and what you think should be. Close that gap. Not by changing the world. By releasing your demand that it be different. In that release, you will find a stillness that no circumstance can disturb.",
+      "cta": "Follow for peace in a noisy world.",
+      "hook_type": "stoic_reflection",
+      "pillar": "Letting go and acceptance"
+    },
+    {
+      "hook": "Be still and consider this.",
+      "body": "You are not your thoughts. This single realisation has freed more human beings from suffering than any medicine ever created. Your thoughts arise like clouds in the sky. They pass. They change. They contradict each other. But you, the awareness behind those thoughts, remain constant. The ancient Zen masters called this your original face. The Stoics called it the inner citadel. Modern psychology calls it metacognition. Whatever the name, the practice is the same. Observe your thoughts without becoming them. When anger arises, notice it. When fear arises, notice it. In that moment of noticing, you have already created space between stimulus and response. That space is where your freedom lives.",
+      "cta": "Save this for when you need clarity.",
+      "hook_type": "ancient_wisdom",
+      "pillar": "Mindfulness and presence"
+    }
+  ],
+  "social_success_guru": [
+    {
+      "hook": "People are telling you everything without speaking.",
+      "body": "Ninety-three percent of communication is nonverbal. That statistic has been debated, but the core truth is undeniable. Before someone says a single word to you, their body has already told you how they feel, what they want, and whether they trust you. Watch their feet. Feet point toward what interests a person and away from what they want to escape. If someone is talking to you but their feet point toward the door, the conversation is already over in their mind. Watch their hands. Open palms signal honesty. Hidden hands signal withholding. Watch their eye contact. Too much signals either deep interest or an attempt to deceive. Too little signals discomfort or submission. Master these signals, and you will never misread a room again.",
+      "cta": "Follow to master social intelligence.",
+      "hook_type": "reading_people",
+      "pillar": "Body language and nonverbal cues"
+    }
+  ],
+  "habits_success_guru": [
+    {
+      "hook": "The two-minute rule will change your life.",
+      "body": "Every habit you want to build has a two-minute version. Want to read more? Read one page. Want to exercise? Put on your running shoes. Want to meditate? Sit and breathe for one hundred and twenty seconds. James Clear proved that the secret to habit formation is not motivation. It is reducing friction until the behaviour becomes almost effortless to start. Your brain resists big commitments. It cannot resist small ones. Once you start, momentum takes over. The hardest part of any run is lacing up your shoes. The hardest part of any book is opening the first page. Make the start so small that it feels ridiculous to say no. Then let consistency compound. Two minutes a day becomes two hours a month becomes a completely transformed life in one year.",
+      "cta": "Follow for habits that change everything.",
+      "hook_type": "habit_science",
+      "pillar": "Habit formation science"
+    }
+  ],
+  "relationships_success_guru": [
+    {
+      "hook": "Your attachment style is running your relationships.",
+      "body": "There are four attachment styles and one of them is silently shaping every relationship you have. Secure attachment means you feel comfortable with intimacy and independence. Anxious attachment means you crave closeness but fear abandonment. Avoidant attachment means you value independence to the point of pushing people away. Disorganised attachment means you want connection but it terrifies you. These patterns formed before you could speak. They were wired into your nervous system by how your caregivers responded to your needs. The good news is that attachment is not destiny. With awareness and consistent practice, you can move toward secure attachment. It starts with understanding which pattern you carry and how it shows up in your daily interactions.",
+      "cta": "Follow for love that actually lasts.",
+      "hook_type": "attachment_insight",
+      "pillar": "Attachment theory and patterns"
+    }
+  ]
+}

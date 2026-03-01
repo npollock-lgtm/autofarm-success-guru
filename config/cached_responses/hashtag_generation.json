@@ -1,0 +1,42 @@
+{
+  "_description": "Emergency fallback hashtag pools when LLM is unavailable. Used by LLMRouter cached fallback for hashtag generation tasks. Curated per brand per platform.",
+  "hashtag_pools": {
+    "human_success_guru": {
+      "core": ["#psychology", "#mindset", "#selfimprovement", "#motivation", "#stoicism", "#mentalhealth", "#darkpsychology", "#selfmastery", "#wisdom", "#discipline"],
+      "rotating": ["#shadowwork", "#cogitivebias", "#powerofmind", "#emotionalintelligence", "#deepthinking", "#mindsetshift", "#personaldevelopment", "#successmindset", "#mentaltoughness", "#philosophyoflife", "#selfawareness", "#humanpsychology", "#innergrowth", "#lifechanging", "#truthbomb"],
+      "trending_templates": ["#{topic}psychology", "#dark{topic}", "#{topic}mindset"]
+    },
+    "wealth_success_guru": {
+      "core": ["#wealth", "#investing", "#financialfreedom", "#money", "#passiveincome", "#wealthbuilding", "#finance", "#moneymindset", "#richlife", "#financialliteracy"],
+      "rotating": ["#investingtips", "#millionairemindset", "#wealthcreation", "#budgeting", "#stockmarket", "#realestate", "#dividends", "#compoundinterest", "#sidehustle", "#financialgoals", "#moneymanagement", "#wealthstrategy", "#indexfunds", "#retirementearly", "#firelife"],
+      "trending_templates": ["#{topic}investing", "#wealth{topic}", "#{topic}money"]
+    },
+    "zen_success_guru": {
+      "core": ["#stoicism", "#innerpeace", "#mindfulness", "#meditation", "#zen", "#philosophy", "#calm", "#presence", "#wisdom", "#serenity"],
+      "rotating": ["#marcusaurelius", "#stoicwisdom", "#peacefulmind", "#letitgo", "#acceptance", "#mindfullife", "#contemplation", "#breathe", "#stillness", "#ancientwisdom", "#zenlife", "#innercalm", "#dailymeditation", "#philosophyquotes", "#mindfulliving"],
+      "trending_templates": ["#stoic{topic}", "#zen{topic}", "#{topic}peace"]
+    },
+    "social_success_guru": {
+      "core": ["#socialskills", "#communication", "#charisma", "#confidence", "#networking", "#socialintelligence", "#bodylanguage", "#influence", "#peopleperson", "#conversation"],
+      "rotating": ["#publicspeaking", "#leadershipskills", "#firstimpression", "#emotionaliq", "#readingpeople", "#negotiation", "#socialanxiety", "#assertiveness", "#persuasion", "#connectionmatters", "#communicationskills", "#socialconfidence", "#magneticpersonality", "#professionalnetworking", "#speakup"],
+      "trending_templates": ["#social{topic}", "#{topic}skills", "#{topic}communication"]
+    },
+    "habits_success_guru": {
+      "core": ["#habits", "#discipline", "#morningroutine", "#productivity", "#consistency", "#selfimprovement", "#dailyhabits", "#growth", "#atomichabits", "#routine"],
+      "rotating": ["#healthyhabits", "#buildhabits", "#habitstacking", "#goalcrusher", "#earlymorning", "#journaling", "#readinghabit", "#fitnesshabit", "#sleephygiene", "#mindfulmorning", "#onepercent", "#compoundeffect", "#habitformation", "#dailydiscipline", "#progressnotperfection"],
+      "trending_templates": ["#{topic}habit", "#morning{topic}", "#daily{topic}"]
+    },
+    "relationships_success_guru": {
+      "core": ["#relationships", "#love", "#attachmenttheory", "#emotionalintelligence", "#selflove", "#dating", "#healthyrelationships", "#communication", "#lovepsychology", "#boundaries"],
+      "rotating": ["#attachmentstyle", "#securelove", "#lovelanguages", "#anxiousattachment", "#avoidantattachment", "#healingjourney", "#vulnerabilityisstrength", "#deepconnection", "#relationshipadvice", "#emotionalhealth", "#innerchild", "#healinglove", "#partnercommunication", "#trustbuilding", "#selfworth"],
+      "trending_templates": ["#love{topic}", "#{topic}relationships", "#{topic}attachment"]
+    }
+  },
+  "platform_limits": {
+    "tiktok": {"max_hashtags": 5, "strategy": "mix 2 core + 2 rotating + 1 trending"},
+    "instagram": {"max_hashtags": 30, "strategy": "mix 8 core + 15 rotating + 7 trending"},
+    "facebook": {"max_hashtags": 5, "strategy": "mix 3 core + 2 rotating"},
+    "youtube": {"max_hashtags": 15, "strategy": "mix 5 core + 7 rotating + 3 trending"},
+    "snapchat": {"max_hashtags": 0, "strategy": "no hashtags"}
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "_description": "Emergency fallback caption templates when LLM is unavailable. Used by LLMRouter cached fallback for caption variation tasks. Templates include platform-specific variations.",
+  "caption_templates": {
+    "human_success_guru": {
+      "opening_variants": [
+        "The uncomfortable truth about {topic}.",
+        "What they never teach you about {topic}.",
+        "Most people get {topic} completely wrong.",
+        "{topic} — and why it matters more than you think.",
+        "The dark side of {topic} nobody discusses."
+      ],
+      "cta_variants": [
+        "Follow @humansuccess.guru for more.",
+        "Save this for when you need it.",
+        "Share with someone who needs to hear this.",
+        "Follow for daily psychology insights.",
+        "Bookmark this. You will need it."
+      ],
+      "emoji_sets": [
+        ["🧠", "⚡", "🔥"],
+        ["💀", "🖤", "⚔️"],
+        ["🎯", "💡", "🧠"]
+      ]
+    },
+    "wealth_success_guru": {
+      "opening_variants": [
+        "The wealth principle most people ignore: {topic}.",
+        "Why {topic} separates the wealthy from everyone else.",
+        "Nobody talks about {topic} in finance. Here is why.",
+        "The money truth about {topic}.",
+        "{topic} — the system the rich never share."
+      ],
+      "cta_variants": [
+        "Follow @wealthsuccess.guru for more.",
+        "Save this for your financial journey.",
+        "Tag someone building their wealth.",
+        "Follow for daily wealth strategies.",
+        "Your future self will thank you for saving this."
+      ],
+      "emoji_sets": [
+        ["💰", "📈", "🎯"],
+        ["💎", "🏦", "📊"],
+        ["🔑", "💡", "💰"]
+      ]
+    },
+    "zen_success_guru": {
+      "opening_variants": [
+        "In stillness, {topic} reveals itself.",
+        "The ancient wisdom of {topic}.",
+        "What the Stoics understood about {topic}.",
+        "{topic} — a meditation.",
+        "Be still and consider {topic}."
+      ],
+      "cta_variants": [
+        "Follow @zensuccess.guru for peace.",
+        "Save this for quiet moments.",
+        "Share with someone seeking stillness.",
+        "Follow for daily wisdom.",
+        "Breathe. Save this. Return when needed."
+      ],
+      "emoji_sets": [
+        ["🌿", "☯️", "✨"],
+        ["🕊️", "🌅", "🧘"],
+        ["🍃", "💫", "🌙"]
+      ]
+    },
+    "social_success_guru": {
+      "opening_variants": [
+        "The social truth about {topic}.",
+        "How {topic} changes every conversation.",
+        "Master {topic} and watch everything shift.",
+        "The communication secret behind {topic}.",
+        "{topic} — what the most charismatic people know."
+      ],
+      "cta_variants": [
+        "Follow @socialsuccess.guru for more.",
+        "Save this for your next conversation.",
+        "Tag someone who needs this.",
+        "Follow to master social intelligence.",
+        "Practice this tomorrow. You will see the difference."
+      ],
+      "emoji_sets": [
+        ["🗣️", "🤝", "⚡"],
+        ["💬", "🎯", "🔑"],
+        ["👁️", "🧠", "💡"]
+      ]
+    },
+    "habits_success_guru": {
+      "opening_variants": [
+        "The habit science behind {topic}.",
+        "Why {topic} is the keystone habit you need.",
+        "One percent better at {topic}. Every day.",
+        "Small systems, big results: {topic}.",
+        "The morning protocol for {topic}."
+      ],
+      "cta_variants": [
+        "Follow @habitssuccess.guru for more.",
+        "Save this and start tomorrow morning.",
+        "Share with your accountability partner.",
+        "Follow for daily habit science.",
+        "Start small. Start now. Start with this."
+      ],
+      "emoji_sets": [
+        ["🌅", "💪", "🎯"],
+        ["⏰", "📝", "🔥"],
+        ["🌱", "📈", "✨"]
+      ]
+    },
+    "relationships_success_guru": {
+      "opening_variants": [
+        "The relationship truth about {topic}.",
+        "What attachment theory says about {topic}.",
+        "Love is a skill. Here is {topic}.",
+        "The emotional intelligence of {topic}.",
+        "{topic} — and why it changes everything in love."
+      ],
+      "cta_variants": [
+        "Follow @relsuccess.guru for more.",
+        "Save this for when you need it most.",
+        "Send this to someone you love.",
+        "Follow for love that actually lasts.",
+        "Your relationships deserve this awareness."
+      ],
+      "emoji_sets": [
+        ["❤️", "🌹", "✨"],
+        ["💕", "🤝", "💫"],
+        ["🫂", "💗", "🌙"]
+      ]
+    }
+  },
+  "platform_adjustments": {
+    "tiktok": {
+      "max_hashtags": 5,
+      "caption_style": "short, punchy, emoji-forward",
+      "max_length": 2200
+    },
+    "instagram": {
+      "max_hashtags": 30,
+      "caption_style": "paragraph format, story-driven",
+      "max_length": 2200
+    },
+    "facebook": {
+      "max_hashtags": 5,
+      "caption_style": "conversational, longer form",
+      "max_length": 63206
+    },
+    "youtube": {
+      "max_hashtags": 15,
+      "caption_style": "SEO-optimized description",
+      "max_length": 5000
+    },
+    "snapchat": {
+      "max_hashtags": 0,
+      "caption_style": "ultra-short, direct",
+      "max_length": 250
+    }
+  }
+}

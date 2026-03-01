@@ -1,0 +1,461 @@
+"""
+Approval Server — HTTP server on proxy-vm (port 8080) handling review decisions.
+
+Routes:
+  /approve/{token}          — Approve a video
+  /reject/{token}           — Reject a video
+  /review/{token}           — Full-quality review page
+  /health                   — System health JSON
+  /dashboard                — Admin dashboard home
+  /dashboard/brand/{id}     — Brand-specific dashboard
+  /dashboard/queue          — Review queue view
+  /dashboard/schedule       — Publishing schedule
+  /dashboard/analytics      — Performance metrics
+  /dashboard/health         — System health dashboard
+  /dashboard/compliance     — Rate limit status
+
+Lightweight: Flask + plain HTML/CSS/JS — no React/Vue.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
+logger = logging.getLogger("autofarm.review_gate.approval_server")
+
+
+# ---------------------------------------------------------------------------
+# ApprovalServer
+# ---------------------------------------------------------------------------
+
+
+class ApprovalServer:
+    """Flask-based approval server for the proxy VM.
+
+    Parameters
+    ----------
+    db:
+        Database helper instance.
+    approval_tracker:
+        ``ApprovalTracker`` for token validation.
+    review_gate:
+        ``ReviewGate`` for decision handling.
+    health_monitor:
+        Optional ``HealthMonitor`` for /health endpoint.
+    host:
+        Bind host.
+    port:
+        Bind port.
+    """
+
+    def __init__(
+        self,
+        db: Any,
+        approval_tracker: Any,
+        review_gate: Any,
+        health_monitor: Optional[Any] = None,
+        host: str = "0.0.0.0",
+        port: int = 8080,
+    ) -> None:
+        self.db = db
+        self.tracker = approval_tracker
+        self.gate = review_gate
+        self.health = health_monitor
+        self.host = host
+        self.port = port
+        self.app = self._create_app()
+
+    # ------------------------------------------------------------------
+    # Flask app factory
+    # ------------------------------------------------------------------
+
+    def _create_app(self) -> Any:
+        """Create and configure the Flask application.
+
+        Returns
+        -------
+        Flask
+            Configured Flask app.
+        """
+        try:
+            from flask import Flask, request, jsonify, render_template_string
+        except ImportError:
+            logger.error("Flask not installed — approval server unavailable")
+            return None
+
+        app = Flask(__name__)
+
+        # --- Approval endpoint ---
+        @app.route("/approve/<token>")
+        async def approve(token: str):
+            """Handle approval via token."""
+            valid = await self.tracker.validate_token(token)
+            if not valid:
+                return render_template_string(
+                    self._error_page("Invalid or expired token")
+                ), 400
+
+            review_id = await self.tracker.get_review_id_for_token(token)
+            if review_id is None:
+                return render_template_string(
+                    self._error_page("Review not found")
+                ), 404
+
+            await self.tracker.mark_approved(token)
+            await self.gate.handle_approval(review_id)
+
+            logger.info("Approved review %d via web", review_id)
+            return render_template_string(
+                self._success_page("✅ Approved", "Video has been added to the publish queue.")
+            )
+
+        # --- Rejection endpoint ---
+        @app.route("/reject/<token>")
+        async def reject(token: str):
+            """Handle rejection via token."""
+            valid = await self.tracker.validate_token(token)
+            if not valid:
+                return render_template_string(
+                    self._error_page("Invalid or expired token")
+                ), 400
+
+            review_id = await self.tracker.get_review_id_for_token(token)
+            if review_id is None:
+                return render_template_string(
+                    self._error_page("Review not found")
+                ), 404
+
+            reason = request.args.get("reason", "")
+            await self.tracker.mark_rejected(token, reason)
+            await self.gate.handle_rejection(review_id, reason)
+
+            logger.info("Rejected review %d via web", review_id)
+            return render_template_string(
+                self._success_page("❌ Rejected", "Video has been removed from the queue.")
+            )
+
+        # --- Full review page ---
+        @app.route("/review/<token>")
+        async def review_page(token: str):
+            """Render full-quality review page."""
+            status = await self.tracker.get_token_status(token)
+            if not status:
+                return render_template_string(
+                    self._error_page("Review not found")
+                ), 404
+
+            review_id = status["review_id"]
+            review = await self.db.fetch_one(
+                "SELECT * FROM reviews WHERE id = ?", (review_id,)
+            )
+            if not review:
+                return render_template_string(
+                    self._error_page("Review data not found")
+                ), 404
+
+            return render_template_string(
+                self._review_page(dict(review), token, status["status"])
+            )
+
+        # --- Health endpoint ---
+        @app.route("/health")
+        async def health():
+            """Return system health JSON."""
+            if self.health:
+                try:
+                    report = await self.health.full_health_check()
+                    return jsonify(report)
+                except Exception as exc:
+                    return jsonify({"status": "error", "message": str(exc)}), 500
+            return jsonify({"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()})
+
+        # --- Dashboard routes ---
+        @app.route("/dashboard")
+        async def dashboard():
+            """Admin dashboard home."""
+            return render_template_string(self._dashboard_home())
+
+        @app.route("/dashboard/brand/<brand_id>")
+        async def dashboard_brand(brand_id: str):
+            """Brand-specific dashboard."""
+            return render_template_string(self._dashboard_brand_page(brand_id))
+
+        @app.route("/dashboard/queue")
+        async def dashboard_queue():
+            """Review queue visualisation."""
+            pending = await self.gate.get_pending_reviews()
+            return render_template_string(self._dashboard_queue_page(pending))
+
+        @app.route("/dashboard/schedule")
+        async def dashboard_schedule():
+            """Publishing schedule view."""
+            return render_template_string(self._dashboard_schedule_page())
+
+        @app.route("/dashboard/analytics")
+        async def dashboard_analytics():
+            """Performance analytics."""
+            return render_template_string(self._dashboard_analytics_page())
+
+        @app.route("/dashboard/health")
+        async def dashboard_health():
+            """System health dashboard."""
+            return render_template_string(self._dashboard_health_page())
+
+        @app.route("/dashboard/compliance")
+        async def dashboard_compliance():
+            """Rate limit / compliance status."""
+            return render_template_string(self._dashboard_compliance_page())
+
+        return app
+
+    # ------------------------------------------------------------------
+    # Run server
+    # ------------------------------------------------------------------
+
+    def run(self) -> None:
+        """Start the Flask server.
+
+        Side Effects
+        ------------
+        Blocks the calling thread.
+        """
+        if self.app is None:
+            logger.error("Cannot start — Flask not available")
+            return
+        logger.info("Starting approval server on %s:%d", self.host, self.port)
+        self.app.run(host=self.host, port=self.port, debug=False)
+
+    # ------------------------------------------------------------------
+    # HTML templates
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _base_html(title: str, body: str) -> str:
+        """Wrap *body* in a basic HTML page.
+
+        Parameters
+        ----------
+        title:
+            Page title.
+        body:
+            Inner HTML.
+
+        Returns
+        -------
+        str
+        """
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>{title} — AutoFarm</title>
+            <style>
+                * {{ margin:0; padding:0; box-sizing:border-box; }}
+                body {{ font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+                        background:#f5f5f5; color:#333; padding:20px; }}
+                .container {{ max-width:800px; margin:0 auto; }}
+                .card {{ background:white; border-radius:12px; padding:24px;
+                         margin:16px 0; box-shadow:0 2px 8px rgba(0,0,0,0.1); }}
+                h1 {{ font-size:24px; margin-bottom:16px; }}
+                h2 {{ font-size:20px; margin-bottom:12px; }}
+                .btn {{ display:inline-block; padding:12px 24px; border-radius:6px;
+                        text-decoration:none; font-weight:600; margin:4px; }}
+                .btn-approve {{ background:#28a745; color:white; }}
+                .btn-reject {{ background:#dc3545; color:white; }}
+                .btn-primary {{ background:#007bff; color:white; }}
+                .nav {{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; }}
+                .nav a {{ padding:8px 16px; background:white; border-radius:6px;
+                          text-decoration:none; color:#333; box-shadow:0 1px 3px rgba(0,0,0,0.1); }}
+                .nav a:hover {{ background:#007bff; color:white; }}
+                table {{ width:100%; border-collapse:collapse; }}
+                th, td {{ text-align:left; padding:8px 12px; border-bottom:1px solid #eee; }}
+                th {{ background:#f8f8f8; font-weight:600; }}
+                .status-pending {{ color:#ffc107; }}
+                .status-approved {{ color:#28a745; }}
+                .status-rejected {{ color:#dc3545; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                {body}
+            </div>
+        </body>
+        </html>
+        """
+
+    def _success_page(self, title: str, message: str) -> str:
+        """Render a success confirmation page."""
+        body = f"""
+        <div class="card" style="text-align:center; padding:60px 24px;">
+            <h1 style="font-size:48px; margin-bottom:20px;">{title}</h1>
+            <p style="font-size:18px; color:#666;">{message}</p>
+            <br>
+            <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+        </div>
+        """
+        return self._base_html(title, body)
+
+    def _error_page(self, message: str) -> str:
+        """Render an error page."""
+        body = f"""
+        <div class="card" style="text-align:center; padding:60px 24px;">
+            <h1 style="font-size:48px;">⚠️</h1>
+            <p style="font-size:18px; color:#dc3545;">{message}</p>
+            <br>
+            <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+        </div>
+        """
+        return self._base_html("Error", body)
+
+    def _review_page(
+        self, review: Dict[str, Any], token: str, status: str
+    ) -> str:
+        """Render the full-quality review page."""
+        brand = review.get("brand_id", "unknown")
+        video_id = review.get("video_id", "?")
+
+        buttons = ""
+        if status == "pending":
+            buttons = f"""
+            <div style="text-align:center; margin:30px 0;">
+                <a href="/approve/{token}" class="btn btn-approve">✅ Approve</a>
+                <a href="/reject/{token}" class="btn btn-reject">❌ Reject</a>
+            </div>
+            """
+        else:
+            buttons = f'<p style="text-align:center;">Status: <b>{status}</b></p>'
+
+        body = f"""
+        <h1>Review — {brand}</h1>
+        <div class="card">
+            <p><strong>Review ID:</strong> {review.get('id', '?')}</p>
+            <p><strong>Video ID:</strong> {video_id}</p>
+            <p><strong>Brand:</strong> {brand}</p>
+            <p><strong>Platforms:</strong> {review.get('platforms', '?')}</p>
+            <p><strong>Created:</strong> {review.get('created_at', '?')}</p>
+        </div>
+        {buttons}
+        """
+        return self._base_html(f"Review {brand}", body)
+
+    def _dashboard_home(self) -> str:
+        """Render the admin dashboard home."""
+        body = """
+        <h1>AutoFarm Dashboard</h1>
+        <div class="nav">
+            <a href="/dashboard/queue">📋 Review Queue</a>
+            <a href="/dashboard/schedule">📅 Schedule</a>
+            <a href="/dashboard/analytics">📊 Analytics</a>
+            <a href="/dashboard/health">💚 Health</a>
+            <a href="/dashboard/compliance">📏 Compliance</a>
+        </div>
+        <div class="card">
+            <h2>Welcome</h2>
+            <p>AutoFarm V6.0 Content Management Dashboard</p>
+        </div>
+        """
+        return self._base_html("Dashboard", body)
+
+    def _dashboard_brand_page(self, brand_id: str) -> str:
+        """Render brand-specific dashboard."""
+        body = f"""
+        <h1>Brand: {brand_id}</h1>
+        <div class="nav">
+            <a href="/dashboard">← Back</a>
+        </div>
+        <div class="card">
+            <h2>Queue Status</h2>
+            <p>Loading brand data...</p>
+        </div>
+        """
+        return self._base_html(f"Brand {brand_id}", body)
+
+    def _dashboard_queue_page(self, pending: list) -> str:
+        """Render review queue page."""
+        rows = ""
+        for r in pending:
+            rows += f"""
+            <tr>
+                <td>{r.get('id', '?')}</td>
+                <td>{r.get('brand_id', '?')}</td>
+                <td>{r.get('video_id', '?')}</td>
+                <td class="status-pending">{r.get('status', '?')}</td>
+                <td>{r.get('created_at', '?')}</td>
+            </tr>
+            """
+        if not rows:
+            rows = '<tr><td colspan="5" style="text-align:center;">No pending reviews</td></tr>'
+
+        body = f"""
+        <h1>Review Queue</h1>
+        <div class="nav"><a href="/dashboard">← Back</a></div>
+        <div class="card">
+            <table>
+                <tr><th>ID</th><th>Brand</th><th>Video</th><th>Status</th><th>Created</th></tr>
+                {rows}
+            </table>
+        </div>
+        """
+        return self._base_html("Queue", body)
+
+    def _dashboard_schedule_page(self) -> str:
+        """Render publishing schedule page."""
+        body = """
+        <h1>Publishing Schedule</h1>
+        <div class="nav"><a href="/dashboard">← Back</a></div>
+        <div class="card">
+            <p>Schedule view — populated by content_queue data.</p>
+        </div>
+        """
+        return self._base_html("Schedule", body)
+
+    def _dashboard_analytics_page(self) -> str:
+        """Render analytics page."""
+        body = """
+        <h1>Analytics</h1>
+        <div class="nav"><a href="/dashboard">← Back</a></div>
+        <div class="card">
+            <p>Performance metrics per brand and platform.</p>
+        </div>
+        """
+        return self._base_html("Analytics", body)
+
+    def _dashboard_health_page(self) -> str:
+        """Render system health dashboard."""
+        body = """
+        <h1>System Health</h1>
+        <div class="nav"><a href="/dashboard">← Back</a></div>
+        <div class="card">
+            <p>Health data loaded from <code>/health</code> endpoint.</p>
+            <div id="health-data">Loading...</div>
+        </div>
+        <script>
+            fetch('/health')
+                .then(r => r.json())
+                .then(d => {
+                    document.getElementById('health-data').innerHTML =
+                        '<pre>' + JSON.stringify(d, null, 2) + '</pre>';
+                })
+                .catch(e => {
+                    document.getElementById('health-data').textContent = 'Error: ' + e;
+                });
+        </script>
+        """
+        return self._base_html("Health", body)
+
+    def _dashboard_compliance_page(self) -> str:
+        """Render compliance / rate-limit status page."""
+        body = """
+        <h1>Compliance</h1>
+        <div class="nav"><a href="/dashboard">← Back</a></div>
+        <div class="card">
+            <p>Rate limit status and daily API usage counters.</p>
+        </div>
+        """
+        return self._base_html("Compliance", body)
