@@ -30,7 +30,7 @@ BRAND_CONFIG = {
     },
     "zen_success_guru": {
         "port": os.getenv("PROXY_PORT_ZEN_SUCCESS_GURU", "3130"),
-        "interface_ip": os.getenv("PROXY_PRIVATE_IP_B"),
+        "interface_ip": os.getenv("PROXY_PRIVATE_IP_A"),
     },
     "social_success_guru": {
         "port": os.getenv("PROXY_PORT_SOCIAL_SUCCESS_GURU", "3131"),
@@ -38,11 +38,11 @@ BRAND_CONFIG = {
     },
     "habits_success_guru": {
         "port": os.getenv("PROXY_PORT_HABITS_SUCCESS_GURU", "3132"),
-        "interface_ip": os.getenv("PROXY_PRIVATE_IP_C"),
+        "interface_ip": os.getenv("PROXY_PRIVATE_IP_B"),
     },
     "relationships_success_guru": {
         "port": os.getenv("PROXY_PORT_RELATIONSHIPS_SUCCESS_GURU", "3133"),
-        "interface_ip": os.getenv("PROXY_PRIVATE_IP_C"),
+        "interface_ip": os.getenv("PROXY_PRIVATE_IP_B"),
     },
 }
 

@@ -26,7 +26,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.cargo/env
 
 # Clone repository
-git clone https://github.com/your-repo/autofarm-success-guru.git /app
+git clone https://github.com/npollock-lgtm/autofarm-success-guru.git /app
 cd /app
 
 # Create virtualenv and install dependencies

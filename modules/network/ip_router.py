@@ -30,9 +30,8 @@ class BrandIPRouter:
     coordinated inauthentic behaviour.
 
     IP Groups:
-        A (human + wealth):        Primary VNIC -> Public IP A
-        B (zen + social):          VNIC B -> Public IP B
-        C (habits + relationships): VNIC C -> Public IP C
+        A (human + wealth + zen):              Primary VNIC -> Public IP A
+        B (social + habits + relationships):   VNIC B -> Public IP B
     """
 
     # Brand to proxy port mapping
@@ -45,14 +44,14 @@ class BrandIPRouter:
         'relationships_success_guru': 3133,
     }
 
-    # Brand to IP group mapping
+    # Brand to IP group mapping (2 groups with 3 brands each)
     BRAND_IP_GROUPS = {
         'human_success_guru': 'A',
         'wealth_success_guru': 'A',
-        'zen_success_guru': 'B',
+        'zen_success_guru': 'A',
         'social_success_guru': 'B',
-        'habits_success_guru': 'C',
-        'relationships_success_guru': 'C',
+        'habits_success_guru': 'B',
+        'relationships_success_guru': 'B',
     }
 
     def __init__(self):

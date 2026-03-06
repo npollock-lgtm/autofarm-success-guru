@@ -62,10 +62,10 @@ Brand                        Squid Port  Interface  Public IP
 -------------------------------------------------------------------
 human_success_guru           3128        eth0       Public IP A
 wealth_success_guru          3129        eth0       Public IP A
-zen_success_guru             3130        eth1       Public IP B
+zen_success_guru             3130        eth0       Public IP A
 social_success_guru          3131        eth1       Public IP B
-habits_success_guru          3132        eth2       Public IP C
-relationships_success_guru   3133        eth2       Public IP C
+habits_success_guru          3132        eth1       Public IP B
+relationships_success_guru   3133        eth1       Public IP B
 ```
 
 ## Data Flow — Content Generation to Publishing
@@ -108,7 +108,7 @@ relationships_success_guru   3133        eth2       Public IP C
               |
 +-------------------------------------------+
 |  proxy-subnet (PUBLIC)                    |
-|  - 3 public IPs (primary + 2 VNICs)      |
+|  - 2 public IPs (primary + 1 VNIC)       |
 |  - Inbound: SSH (22), Approval (8080)     |
 |  - Squid ports (3128-3133) from content   |
 |    subnet only                            |

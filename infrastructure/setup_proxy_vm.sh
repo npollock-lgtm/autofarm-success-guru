@@ -10,7 +10,7 @@ sudo apt install -y squid net-tools python3.11 python3.11-venv git curl wget ipr
 # Install uv and Python dependencies (lightweight — proxy + approval only)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.cargo/env
-git clone https://github.com/your-repo/autofarm-success-guru.git /app
+git clone https://github.com/npollock-lgtm/autofarm-success-guru.git /app
 cd /app
 uv venv .venv
 source .venv/bin/activate
