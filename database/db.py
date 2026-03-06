@@ -95,6 +95,13 @@ class Database:
         """
         return self.pool.query_one(sql, params)
 
+    # Alias for compatibility — many modules use fetch_one
+    fetch_one = query_one
+
+    def fetch_all(self, sql: str, params: tuple = ()) -> list[dict]:
+        """Alias for query() — used by some modules."""
+        return self.query(sql, params)
+
     def write(self, sql: str, params: tuple = ()) -> Any:
         """
         Executes a write with process-level locking.
