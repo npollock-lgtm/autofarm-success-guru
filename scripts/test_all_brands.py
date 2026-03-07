@@ -291,16 +291,12 @@ def compress_for_telegram(video_path: str, max_size_mb: float = 45.0) -> str:
         return video_path
 
 
-def send_via_proxy(video_path: str, brand_id: str, script_text: str) -> bool:
-    """Forward video to proxy VM for Telegram/email delivery.
+def send_notification(video_path: str, brand_id: str, script_text: str) -> bool:
+    """Send video notification via Telegram (primary) with Gmail fallback.
 
-    The content VM has slow NAT-based internet. The proxy VM has a direct
-    public IP with faster upload. This function:
-    1. SCPs the video to the proxy VM /tmp/
-    2. SSHs to proxy and runs send_video.py (Telegram + Gmail fallback)
-    3. Cleans up the temp file on proxy
-
-    Falls back to direct send if proxy forwarding fails.
+    Tries Telegram first. If Telegram fails (timeout, file too large),
+    falls back to sending an email via Gmail SMTP with the video attached
+    (if under 20MB) or a notification email with SCP download instructions.
 
     Parameters
     ----------
@@ -314,115 +310,144 @@ def send_via_proxy(video_path: str, brand_id: str, script_text: str) -> bool:
     Returns
     -------
     bool
-        True if sent via any method.
-    """
-    proxy_ip = os.getenv("PROXY_VM_INTERNAL_IP", "10.0.2.112")
-    proxy_user = os.getenv("PROXY_VM_USER", "ubuntu")
-    filename = os.path.basename(video_path)
-    remote_path = f"/tmp/{filename}"
-
-    # Compress locally first if needed
-    send_path = compress_for_telegram(video_path)
-    send_filename = os.path.basename(send_path)
-    remote_send_path = f"/tmp/{send_filename}"
-
-    # Step 1: SCP video to proxy VM
-    print(f"  [proxy] Copying to proxy VM ({proxy_user}@{proxy_ip})...")
-    scp_cmd = [
-        "scp", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
-        send_path, f"{proxy_user}@{proxy_ip}:{remote_send_path}",
-    ]
-    try:
-        result = subprocess.run(scp_cmd, capture_output=True, timeout=120, text=True)
-        if result.returncode != 0:
-            print(f"  [proxy] SCP failed: {result.stderr[:200]}")
-            return send_direct_fallback(send_path, brand_id, script_text)
-    except Exception as e:
-        print(f"  [proxy] SCP error: {e}")
-        return send_direct_fallback(send_path, brand_id, script_text)
-
-    print(f"  [proxy] SCP done, triggering send_video.py on proxy...")
-
-    # Step 2: SSH to proxy and run send_video.py
-    # Escape the caption for shell (single quotes with escaping)
-    safe_caption = script_text[:800].replace("'", "'\\''")
-    ssh_cmd = [
-        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
-        f"{proxy_user}@{proxy_ip}",
-        f"cd /app && source .venv/bin/activate && "
-        f"PYTHONPATH=/app python scripts/send_video.py "
-        f"'{remote_send_path}' '{brand_id}' '{safe_caption}'"
-    ]
-    try:
-        result = subprocess.run(ssh_cmd, capture_output=True, timeout=360, text=True)
-        print(result.stdout)
-        if result.stderr:
-            print(f"  [proxy] stderr: {result.stderr[:300]}")
-
-        # Cleanup temp file on proxy
-        subprocess.run(
-            ["ssh", "-o", "StrictHostKeyChecking=no", f"{proxy_user}@{proxy_ip}",
-             f"rm -f {remote_send_path}"],
-            capture_output=True, timeout=10,
-        )
-
-        if result.returncode == 0:
-            print(f"  [OK] Sent via proxy")
-            return True
-        else:
-            print(f"  [proxy] send_video.py returned error")
-            return False
-
-    except Exception as e:
-        print(f"  [proxy] SSH error: {e}")
-        return send_direct_fallback(send_path, brand_id, script_text)
-
-
-def send_direct_fallback(video_path: str, brand_id: str, script_text: str) -> bool:
-    """Direct Telegram send from content VM (last resort).
-
-    Parameters
-    ----------
-    video_path : str
-        Path to video file.
-    brand_id : str
-        Brand identifier.
-    script_text : str
-        Script content for caption.
-
-    Returns
-    -------
-    bool
-        True if sent successfully.
+        True if sent via either channel.
     """
     import requests
+    import smtplib
+    from datetime import datetime, timezone
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders
 
-    print(f"  [fallback] Trying direct Telegram send from content VM...")
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.getenv("TELEGRAM_REVIEW_CHAT_ID", "")
-    if not bot_token or not chat_id:
-        print(f"  [fallback] Telegram not configured")
+    if not os.path.exists(video_path):
+        print(f"  [ERROR] Video not found: {video_path}")
         return False
 
-    caption = f"Brand: {brand_id}\n\n{script_text[:800]}"
-    url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
+    size_mb = os.path.getsize(video_path) / (1024 * 1024)
+    print(f"  File: {os.path.basename(video_path)} ({size_mb:.1f}MB)")
 
-    try:
-        with open(video_path, "rb") as vf:
-            resp = requests.post(
-                url,
-                data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
-                files={"video": (os.path.basename(video_path), vf, "video/mp4")},
-                timeout=300,
-            )
-        if resp.status_code == 200:
-            print(f"  [fallback] Sent to Telegram directly")
-            return True
+    # --- Try Telegram first ---
+    print(f"\n  [1] Trying Telegram...")
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_REVIEW_CHAT_ID", "")
+
+    if bot_token and chat_id:
+        # Compress if needed
+        send_path = compress_for_telegram(video_path)
+        send_size = os.path.getsize(send_path) / (1024 * 1024)
+
+        if send_size <= 50:
+            caption = f"<b>{brand_id}</b>\n\n{script_text[:900]}"
+            url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
+            try:
+                with open(send_path, "rb") as vf:
+                    resp = requests.post(
+                        url,
+                        data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+                        files={"video": (os.path.basename(send_path), vf, "video/mp4")},
+                        timeout=300,
+                    )
+                if resp.status_code == 200:
+                    print(f"  [OK] Sent to Telegram")
+                    return True
+                else:
+                    print(f"  [WARN] Telegram API error: {resp.status_code}")
+            except Exception as e:
+                print(f"  [WARN] Telegram upload failed: {e}")
         else:
-            print(f"  [fallback] Telegram error: {resp.status_code} {resp.text[:200]}")
-            return False
+            print(f"  [WARN] Video too large for Telegram ({send_size:.0f}MB)")
+    else:
+        print(f"  [WARN] Telegram not configured")
+
+    # --- Fallback to Gmail ---
+    print(f"\n  [2] Falling back to Gmail email...")
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASSWORD", "") or os.getenv("SMTP_PASS", "")
+    recipient = os.getenv("NOTIFY_EMAIL_TO", "") or smtp_user
+
+    if not smtp_user or not smtp_pass:
+        print(f"  [FAIL] Gmail SMTP not configured")
+        return False
+
+    if not recipient:
+        print(f"  [FAIL] No email recipient configured")
+        return False
+
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    brand_name = brand_id.replace("_success_guru", "").replace("_", " ").title()
+
+    msg = MIMEMultipart()
+    msg["Subject"] = f"AutoFarm Video: {brand_name} Success Guru — {now}"
+    msg["From"] = f"{os.getenv('SMTP_FROM_NAME', 'AutoFarm V6')} <{smtp_user}>"
+    msg["To"] = recipient
+
+    # Build HTML body
+    html = f"""
+    <h2>New Video Generated</h2>
+    <table style="border-collapse:collapse;">
+      <tr><td><strong>Brand:</strong></td><td>{brand_name} Success Guru</td></tr>
+      <tr><td><strong>Generated:</strong></td><td>{now}</td></tr>
+      <tr><td><strong>File Size:</strong></td><td>{size_mb:.1f} MB</td></tr>
+      <tr><td><strong>File:</strong></td><td>{os.path.basename(video_path)}</td></tr>
+    </table>
+    <h3>Script:</h3>
+    <p style="background:#f5f5f5; padding:12px; border-radius:4px;">
+      {script_text[:2000].replace(chr(10), '<br>')}
+    </p>
+    """
+
+    if size_mb <= 20:
+        html += "<p><strong>Video attached.</strong></p>"
+    else:
+        html += f"""
+        <p><strong>Video too large to attach ({size_mb:.0f}MB).</strong></p>
+        <p>Download via SCP (two-hop):</p>
+        <pre style="background:#222; color:#0f0; padding:10px;">
+# From proxy VM:
+scp opc@10.0.1.45:{video_path} /tmp/
+
+# Then from your PC:
+scp ubuntu@150.230.172.213:/tmp/{os.path.basename(video_path)} ~/Downloads/
+        </pre>
+        """
+
+    msg.attach(MIMEText(html, "html"))
+
+    # Attach video if small enough (Gmail ~25MB limit, use 20MB to be safe)
+    if size_mb <= 20:
+        print(f"  [email] Attaching video ({size_mb:.1f}MB)...")
+        try:
+            with open(video_path, "rb") as vf:
+                part = MIMEBase("video", "mp4")
+                part.set_payload(vf.read())
+                encoders.encode_base64(part)
+                part.add_header(
+                    "Content-Disposition",
+                    f'attachment; filename="{os.path.basename(video_path)}"',
+                )
+                msg.attach(part)
+        except Exception as e:
+            print(f"  [WARN] Failed to attach: {e}")
+
+    # Send email
+    print(f"  [email] Sending to {recipient}...")
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=60) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, [recipient], msg.as_string())
+        print(f"  [OK] Email sent successfully")
+        return True
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"  [FAIL] Gmail auth failed: {e}")
+        return False
     except Exception as e:
-        print(f"  [fallback] Direct send failed: {e}")
+        print(f"  [FAIL] Email error: {e}")
         return False
 
 
@@ -568,9 +593,9 @@ async def run_brand_pipeline(brand_id: str, topic: str, broll_mode: str = "fresh
     size_mb = video_result.get("file_size_mb", 0)
     print(f"  [OK] Video: {video_path} ({duration}s, {size_mb:.1f}MB) ({time.time()-t0:.1f}s)")
 
-    # --- Send notification (Telegram via proxy → Gmail fallback) ---
+    # --- Send notification (Telegram → Gmail fallback) ---
     print(f"\n  Sending video notification...")
-    send_via_proxy(video_path, brand_id, script_text)
+    send_notification(video_path, brand_id, script_text)
 
     total = time.time() - start
     print(f"\n  TOTAL TIME: {total:.1f}s")
