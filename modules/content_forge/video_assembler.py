@@ -384,8 +384,8 @@ class VideoAssembler:
             "-stream_loop", str(loops),
             "-i", bg_path,
             "-t", str(target_duration),
-            "-vf", f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=decrease,"
-                   f"pad={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:(ow-iw)/2:(oh-ih)/2",
+            "-vf", f"scale={OUTPUT_WIDTH}:{OUTPUT_HEIGHT}:force_original_aspect_ratio=increase,"
+                   f"crop={OUTPUT_WIDTH}:{OUTPUT_HEIGHT},setsar=1",
             "-c:v", "libx264", "-preset", "fast", "-crf", str(CRF),
             "-an", output,
         ]
@@ -486,8 +486,10 @@ class VideoAssembler:
             srt_escaped = captions_srt.replace("\\", "/").replace(":", "\\:")
             vf_parts.append(
                 f"subtitles='{srt_escaped}':force_style="
-                "'Alignment=2,FontSize=18,PrimaryColour=&H00FFFFFF,"
-                "OutlineColour=&H00000000,Outline=2,MarginV=60'"
+                "'Alignment=2,FontName=Liberation Sans,Bold=1,"
+                "FontSize=28,PrimaryColour=&H00FFFFFF,"
+                "OutlineColour=&H00000000,Outline=3,"
+                "BackColour=&H80000000,Shadow=0,MarginV=80'"
             )
 
         vf_str = ",".join(vf_parts) if vf_parts else None

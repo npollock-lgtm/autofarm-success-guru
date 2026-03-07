@@ -144,8 +144,8 @@ def concatenate_broll(clip_paths: list, output_path: str, target_duration: float
         scaled = os.path.join(list_dir, f"scaled_{i}.mp4")
         cmd = [
             "ffmpeg", "-y", "-i", clip,
-            "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,"
-                   "pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1",
+            "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,"
+                   "crop=1080:1920,setsar=1",
             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
             "-r", "30", "-an", "-t", "12",
             scaled,
