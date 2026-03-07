@@ -151,7 +151,7 @@ def concatenate_broll(clip_paths: list, output_path: str, target_duration: float
             scaled,
         ]
         try:
-            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            subprocess.run(cmd, check=True, capture_output=True, timeout=180)
             if os.path.exists(scaled) and os.path.getsize(scaled) > 0:
                 scaled_clips.append(scaled)
         except Exception as e:
@@ -182,6 +182,32 @@ def concatenate_broll(clip_paths: list, output_path: str, target_duration: float
         return scaled_clips[0] if scaled_clips else ""
 
 
+def compress_for_telegram(video_path: str, max_size_mb: float = 45.0) -> str:
+    """Compress video to fit Telegram's 50MB limit."""
+    size_mb = os.path.getsize(video_path) / (1024 * 1024)
+    if size_mb <= max_size_mb:
+        return video_path
+
+    print(f"  [compress] {size_mb:.0f}MB > {max_size_mb:.0f}MB, compressing...")
+    compressed = video_path.replace(".mp4", "_tg.mp4")
+    cmd = [
+        "ffmpeg", "-y", "-i", video_path,
+        "-vf", "scale=720:-2",
+        "-c:v", "libx264", "-crf", "30", "-preset", "fast",
+        "-c:a", "aac", "-b:a", "96k",
+        "-movflags", "+faststart",
+        compressed,
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=300)
+        new_size = os.path.getsize(compressed) / (1024 * 1024)
+        print(f"  [compress] Done: {new_size:.1f}MB")
+        return compressed
+    except Exception as e:
+        print(f"  [WARN] Compression failed: {e}")
+        return video_path
+
+
 def send_to_telegram(video_path: str, brand_id: str, script_text: str):
     """Send completed video to Telegram."""
     import requests
@@ -192,21 +218,29 @@ def send_to_telegram(video_path: str, brand_id: str, script_text: str):
         print(f"  [!] Telegram not configured, skipping send")
         return False
 
+    # Compress if over 45MB
+    send_path = compress_for_telegram(video_path)
+
     caption = f"Brand: {brand_id}\n\n{script_text[:800]}"
     url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
 
-    with open(video_path, "rb") as vf:
-        resp = requests.post(
-            url,
-            data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
-            files={"video": (os.path.basename(video_path), vf, "video/mp4")},
-            timeout=120,
-        )
-    if resp.status_code == 200:
-        print(f"  [OK] Sent to Telegram")
-        return True
-    else:
-        print(f"  [!] Telegram error: {resp.status_code} {resp.text[:200]}")
+    try:
+        with open(send_path, "rb") as vf:
+            resp = requests.post(
+                url,
+                data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
+                files={"video": (os.path.basename(send_path), vf, "video/mp4")},
+                timeout=180,
+            )
+        if resp.status_code == 200:
+            print(f"  [OK] Sent to Telegram")
+            return True
+        else:
+            print(f"  [!] Telegram error: {resp.status_code} {resp.text[:200]}")
+            return False
+    except Exception as e:
+        print(f"  [!] Telegram send failed: {e}")
+        return False
         return False
 
 # ---------------------------------------------------------------------------
