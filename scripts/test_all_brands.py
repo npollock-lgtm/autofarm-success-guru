@@ -2,7 +2,8 @@
 Full pipeline test — generate one video per brand.
 
 Runs: Script → TTS → B-roll → Captions → Video Assembly → Telegram notification
-for all 6 brands.
+for all 6 brands. B-roll clips are fetched with varied search terms and
+concatenated into a seamless background to avoid repetition.
 """
 
 import asyncio
@@ -43,6 +44,16 @@ TOPICS = {
     "relationships_success_guru": "Why emotionally intelligent people never say these 3 phrases",
 }
 
+# Multiple varied search terms per brand for diverse b-roll
+BROLL_SEARCHES = {
+    "human_success_guru": ["dark motivation", "person thinking alone", "chess strategy", "city night lights", "man walking determined"],
+    "wealth_success_guru": ["money growth", "stock market", "luxury lifestyle", "business meeting", "gold coins"],
+    "zen_success_guru": ["meditation peaceful", "zen garden stones", "mountain sunrise", "calm ocean waves", "forest path"],
+    "social_success_guru": ["people talking", "body language", "confident speaker", "crowd gathering", "eye contact"],
+    "habits_success_guru": ["morning routine", "workout discipline", "writing journal", "alarm clock sunrise", "healthy breakfast"],
+    "relationships_success_guru": ["couple conversation", "emotional connection", "family together", "holding hands", "deep conversation"],
+}
+
 # Stub rate limiter for b-roll fetcher
 class StubRateLimiter:
     async def acquire(self, *a, **kw):
@@ -51,8 +62,70 @@ class StubRateLimiter:
         return True
 
 # ---------------------------------------------------------------------------
-# Telegram sender
+# Helpers
 # ---------------------------------------------------------------------------
+
+def concatenate_broll(clip_paths: list, output_path: str, target_duration: float) -> str:
+    """Concatenate multiple b-roll clips into one seamless background video.
+
+    Scales all clips to 1080x1920 portrait, concatenates them, and trims
+    to target_duration. If clips are shorter than needed, the last clip
+    is looped to fill the gap.
+    """
+    if not clip_paths:
+        return ""
+
+    # Create a temp file listing all clips for FFmpeg concat
+    list_dir = os.path.dirname(output_path)
+    os.makedirs(list_dir, exist_ok=True)
+    list_file = os.path.join(list_dir, "concat_list.txt")
+
+    # First, scale each clip to 1080x1920 and re-encode for compatibility
+    scaled_clips = []
+    for i, clip in enumerate(clip_paths):
+        scaled = os.path.join(list_dir, f"scaled_{i}.mp4")
+        cmd = [
+            "ffmpeg", "-y", "-i", clip,
+            "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,"
+                   "pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1",
+            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+            "-r", "30", "-an", "-t", "15",
+            scaled,
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, timeout=60)
+            if os.path.exists(scaled) and os.path.getsize(scaled) > 0:
+                scaled_clips.append(scaled)
+        except Exception as e:
+            print(f"    [WARN] Failed to scale clip {i}: {e}")
+
+    if not scaled_clips:
+        return ""
+
+    # Write concat list — repeat clips if needed to fill duration
+    total_clip_duration = len(scaled_clips) * 10  # estimate ~10s each
+    repeats = max(int(target_duration / max(total_clip_duration, 1)) + 1, 1)
+
+    with open(list_file, "w") as f:
+        for _ in range(repeats):
+            for sc in scaled_clips:
+                f.write(f"file '{sc}'\n")
+
+    # Concatenate and trim to target duration
+    cmd = [
+        "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+        "-i", list_file,
+        "-t", str(target_duration),
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-an", output_path,
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=180)
+        return output_path
+    except Exception as e:
+        print(f"    [WARN] Concatenation failed: {e}")
+        return scaled_clips[0] if scaled_clips else ""
+
 
 def send_to_telegram(video_path: str, brand_id: str, script_text: str):
     """Send completed video to Telegram."""
@@ -127,10 +200,11 @@ async def run_brand_pipeline(brand_id: str, topic: str):
         return False
     audio_path = tts_result.audio_path
     word_timestamps = tts_result.word_timestamps or []
-    print(f"  [OK] Audio: {audio_path} ({time.time()-t0:.1f}s)")
+    vo_duration = tts_result.duration_seconds
+    print(f"  [OK] Audio: {audio_path} ({vo_duration:.1f}s) ({time.time()-t0:.1f}s)")
 
-    # --- Step 3: B-Roll (async) ---
-    print(f"\n  [3/5] Fetching b-roll clips...")
+    # --- Step 3: B-Roll — fetch multiple clips with varied searches ---
+    print(f"\n  [3/5] Fetching b-roll clips (varied searches)...")
     t0 = time.time()
     broll_fetcher = BRollFetcher(
         db=db,
@@ -138,24 +212,52 @@ async def run_brand_pipeline(brand_id: str, topic: str):
         pexels_api_key=os.getenv("PEXELS_API_KEY", ""),
         pixabay_api_key=os.getenv("PIXABAY_API_KEY", ""),
     )
-    theme = topic.split(":")[0] if ":" in topic else topic[:40]
-    try:
-        broll_clips = await broll_fetcher.fetch_broll(
-            brand_id=brand_id,
-            theme=theme,
-            duration_seconds=15.0,
-            count=2,
-        )
-    except Exception as e:
-        print(f"  [WARN] B-roll fetch error: {e}")
-        broll_clips = []
 
-    # broll_clips is a list of file path strings
-    if isinstance(broll_clips, list):
-        broll_paths = [p for p in broll_clips if p and isinstance(p, str) and os.path.exists(p)]
+    all_broll_paths = []
+    search_terms = BROLL_SEARCHES.get(brand_id, [topic[:30]])
+    for search_term in search_terms:
+        try:
+            clips = await broll_fetcher.fetch_broll(
+                brand_id=brand_id,
+                theme=search_term,
+                duration_seconds=12.0,
+                count=1,
+            )
+            if isinstance(clips, list):
+                for p in clips:
+                    if p and isinstance(p, str) and os.path.exists(p):
+                        all_broll_paths.append(p)
+        except Exception as e:
+            print(f"    [WARN] B-roll '{search_term}': {e}")
+
+    print(f"  [OK] B-roll: {len(all_broll_paths)} unique clips ({time.time()-t0:.1f}s)")
+
+    # --- Concatenate b-roll into seamless background ---
+    target_duration = max(vo_duration + 2.0, 30.0)
+    bg_dir = f"/app/media/{brand_id}/temp"
+    os.makedirs(bg_dir, exist_ok=True)
+    bg_path = os.path.join(bg_dir, "bg_concat.mp4")
+
+    if all_broll_paths:
+        print(f"  [3b] Concatenating {len(all_broll_paths)} clips into background...")
+        bg_path = concatenate_broll(all_broll_paths, bg_path, target_duration)
+        if not bg_path:
+            print(f"  [WARN] Concat failed, using solid color fallback")
+            bg_path = os.path.join(bg_dir, "bg_solid.mp4")
+            subprocess.run([
+                "ffmpeg", "-y", "-f", "lavfi",
+                "-i", "color=c=0x1a1a2e:s=1080x1920:d=60",
+                "-c:v", "libx264", "-t", "60", "-pix_fmt", "yuv420p",
+                bg_path
+            ], capture_output=True, timeout=30)
     else:
-        broll_paths = []
-    print(f"  [OK] B-roll: {len(broll_paths)} clips ({time.time()-t0:.1f}s)")
+        print(f"  [WARN] No b-roll clips, using solid color background")
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", "color=c=0x1a1a2e:s=1080x1920:d=60",
+            "-c:v", "libx264", "-t", "60", "-pix_fmt", "yuv420p",
+            bg_path
+        ], capture_output=True, timeout=30)
 
     # --- Step 4: Captions / SRT (sync) ---
     print(f"\n  [4/5] Generating subtitles...")
@@ -181,23 +283,10 @@ async def run_brand_pipeline(brand_id: str, topic: str):
     assembler = VideoAssembler()
     os.makedirs(f"/app/media/{brand_id}/videos", exist_ok=True)
 
-    # Create a solid color background as base if no b-roll
-    bg_path = f"/app/media/{brand_id}/bg_temp.mp4"
-    if not broll_paths:
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "lavfi",
-            "-i", "color=c=0x1a1a2e:s=1080x1920:d=60",
-            "-c:v", "libx264", "-t", "60", "-pix_fmt", "yuv420p",
-            bg_path
-        ], capture_output=True, timeout=30)
-    else:
-        bg_path = broll_paths[0]
-
     video_result = await assembler.assemble_video(
         brand_id=brand_id,
         background_path=bg_path,
         voiceover_path=audio_path,
-        broll_clips=broll_paths if broll_paths else None,
         captions_srt=captions_srt,
     )
     if not video_result or not video_result.get("video_path"):
