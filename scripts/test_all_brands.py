@@ -122,11 +122,11 @@ async def run_brand_pipeline(brand_id: str, topic: str):
         script_text=script_text,
         brand_id=brand_id,
     )
-    if not tts_result or not tts_result.get("audio_path"):
+    if not tts_result or not tts_result.audio_path:
         print(f"  [FAIL] TTS failed for {brand_id}")
         return False
-    audio_path = tts_result["audio_path"]
-    word_timestamps = tts_result.get("word_timestamps", [])
+    audio_path = tts_result.audio_path
+    word_timestamps = tts_result.word_timestamps or []
     print(f"  [OK] Audio: {audio_path} ({time.time()-t0:.1f}s)")
 
     # --- Step 3: B-Roll (async) ---
@@ -202,8 +202,8 @@ async def run_brand_pipeline(brand_id: str, topic: str):
         return False
 
     video_path = video_result["video_path"]
-    duration = video_result.get("duration", "?")
-    size_mb = os.path.getsize(video_path) / (1024 * 1024) if os.path.exists(video_path) else 0
+    duration = video_result.get("duration_seconds", "?")
+    size_mb = video_result.get("file_size_mb", 0)
     print(f"  [OK] Video: {video_path} ({duration}s, {size_mb:.1f}MB) ({time.time()-t0:.1f}s)")
 
     # --- Send to Telegram ---
