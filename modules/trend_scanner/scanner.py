@@ -1,16 +1,20 @@
 """
 Trend scanner coordinator for AutoFarm Zero — Success Guru Network v6.0.
 
-Orchestrates all trend scanning sources (Reddit, Google Trends, News)
-for all brands. Called by the scan_and_generate cron job to discover
-fresh content topics.
+Orchestrates all trend scanning sources (Reddit, Google Trends, News,
+TikTok, Instagram, YouTube, Snapchat) for all brands. Called by the
+scan_and_generate cron job to discover fresh content topics.
 
 Scan sequence per brand:
 1. Reddit: Hot and top posts from brand subreddits
 2. Google Trends: Rising queries for brand keywords
 3. News: Recent articles matching brand topics
-4. Deduplicate across sources
-5. Store unique high-relevance trends for content generation
+4. TikTok: Trending topics via Google Trends + News RSS
+5. Instagram: Trending topics via Google Trends + News RSS
+6. YouTube: Trending videos via Data API v3 + Google Trends
+7. Snapchat: Trending topics via Google Trends + News RSS
+8. Deduplicate across sources
+9. Store unique high-relevance trends for content generation
 """
 
 import json
@@ -26,6 +30,10 @@ from modules.trend_scanner.base_scanner import TrendItem
 from modules.trend_scanner.reddit_scanner import RedditScanner
 from modules.trend_scanner.google_trends_scanner import GoogleTrendsScanner
 from modules.trend_scanner.news_scanner import NewsScanner
+from modules.trend_scanner.tiktok_scanner import TikTokScanner
+from modules.trend_scanner.instagram_scanner import InstagramScanner
+from modules.trend_scanner.youtube_scanner import YouTubeScanner
+from modules.trend_scanner.snapchat_scanner import SnapchatScanner
 from modules.compliance.rate_limit_manager import RateLimitManager
 from modules.infrastructure.resource_scheduler import get_scheduler
 
@@ -40,6 +48,9 @@ class TrendScanner:
     brands, collects trends from all sources, deduplicates, and stores
     results. Respects resource constraints via ResourceScheduler.
 
+    Scanners: Reddit, Google Trends, News, TikTok, Instagram, YouTube,
+    Snapchat (7 total).
+
     Attributes:
         SCAN_DELAY_BETWEEN_BRANDS: Seconds between brand scans.
         MIN_TRENDS_FOR_GENERATION: Minimum unused trends before triggering generation.
@@ -53,13 +64,17 @@ class TrendScanner:
         Initializes the TrendScanner with all sub-scanners.
 
         Side effects:
-            Creates instances of all scanner types.
+            Creates instances of all 7 scanner types.
             Creates Database and ResourceScheduler instances.
         """
         self.db = Database()
         self.reddit_scanner = RedditScanner()
         self.google_trends_scanner = GoogleTrendsScanner()
         self.news_scanner = NewsScanner()
+        self.tiktok_scanner = TikTokScanner()
+        self.instagram_scanner = InstagramScanner()
+        self.youtube_scanner = YouTubeScanner()
+        self.snapchat_scanner = SnapchatScanner()
         self._scheduler = get_scheduler()
 
     def scan_all_brands(self) -> dict:
@@ -70,7 +85,8 @@ class TrendScanner:
             Dict with per-brand scan results and total counts.
 
         Side effects:
-            Makes HTTP requests to Reddit, Google Trends, and News.
+            Makes HTTP requests to Reddit, Google Trends, News,
+            TikTok, Instagram, YouTube, and Snapchat sources.
             Stores discovered trends in the database.
             Checks resource availability before scanning.
         """
@@ -81,8 +97,8 @@ class TrendScanner:
                             reason=reason)
             return {'status': 'skipped', 'reason': reason}
 
-        from config.settings import load_brands_config
-        brands = load_brands_config()
+        from config.settings import get_brands_config
+        brands = get_brands_config().get('brands', {})
 
         results = {
             'status': 'completed',
@@ -154,6 +170,10 @@ class TrendScanner:
             'reddit': {'found': 0, 'stored': 0},
             'google_trends': {'found': 0, 'stored': 0},
             'news': {'found': 0, 'stored': 0},
+            'tiktok': {'found': 0, 'stored': 0},
+            'instagram': {'found': 0, 'stored': 0},
+            'youtube': {'found': 0, 'stored': 0},
+            'snapchat': {'found': 0, 'stored': 0},
             'total_found': 0,
             'total_stored': 0,
             'duration_seconds': 0,
@@ -208,14 +228,77 @@ class TrendScanner:
                           brand_id=brand_id, error=str(e))
             result['news'] = {'found': 0, 'stored': 0, 'error': str(e)}
 
+        # TikTok scan
+        try:
+            tiktok_trends = self.tiktok_scanner.scan(brand_id, brand_config)
+            tiktok_stored = self.tiktok_scanner.store_trends(
+                brand_id, tiktok_trends
+            )
+            result['tiktok'] = {
+                'found': len(tiktok_trends),
+                'stored': tiktok_stored,
+            }
+        except Exception as e:
+            logger.error("tiktok_scan_failed",
+                          brand_id=brand_id, error=str(e))
+            result['tiktok'] = {'found': 0, 'stored': 0, 'error': str(e)}
+
+        # Instagram scan
+        try:
+            ig_trends = self.instagram_scanner.scan(brand_id, brand_config)
+            ig_stored = self.instagram_scanner.store_trends(
+                brand_id, ig_trends
+            )
+            result['instagram'] = {
+                'found': len(ig_trends),
+                'stored': ig_stored,
+            }
+        except Exception as e:
+            logger.error("instagram_scan_failed",
+                          brand_id=brand_id, error=str(e))
+            result['instagram'] = {'found': 0, 'stored': 0, 'error': str(e)}
+
+        # YouTube scan
+        try:
+            yt_trends = self.youtube_scanner.scan(brand_id, brand_config)
+            yt_stored = self.youtube_scanner.store_trends(
+                brand_id, yt_trends
+            )
+            result['youtube'] = {
+                'found': len(yt_trends),
+                'stored': yt_stored,
+            }
+        except Exception as e:
+            logger.error("youtube_scan_failed",
+                          brand_id=brand_id, error=str(e))
+            result['youtube'] = {'found': 0, 'stored': 0, 'error': str(e)}
+
+        # Snapchat scan
+        try:
+            snap_trends = self.snapchat_scanner.scan(brand_id, brand_config)
+            snap_stored = self.snapchat_scanner.store_trends(
+                brand_id, snap_trends
+            )
+            result['snapchat'] = {
+                'found': len(snap_trends),
+                'stored': snap_stored,
+            }
+        except Exception as e:
+            logger.error("snapchat_scan_failed",
+                          brand_id=brand_id, error=str(e))
+            result['snapchat'] = {'found': 0, 'stored': 0, 'error': str(e)}
+
         # Totals
+        all_sources = [
+            result['reddit'], result['google_trends'], result['news'],
+            result['tiktok'], result['instagram'], result['youtube'],
+            result['snapchat'],
+        ]
         result['total_found'] = sum(
-            r.get('found', 0) for r in
-            [result['reddit'], result['google_trends'], result['news']]
+            r.get('found', 0) for r in all_sources
         )
         result['total_stored'] = sum(
-            r.get('stored', 0) for r in
-            [result['reddit'], result['google_trends'], result['news']]
+            r.get('stored', 0) for r in all_sources
         )
         result['duration_seconds'] = round(time.time() - start_time, 2)
 

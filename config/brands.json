@@ -51,7 +51,12 @@
       "trend_sources": {
         "subreddits": ["stoicism", "selfimprovement", "psychology", "getdisciplined", "DecidingToBeBetter"],
         "news_keywords": ["psychology research", "cognitive bias", "mental resilience"],
-        "google_trends_keywords": ["dark psychology", "stoic mindset", "self mastery"]
+        "google_trends_keywords": ["dark psychology", "stoic mindset", "self mastery"],
+        "tiktok_keywords": ["dark psychology tiktok", "stoic mindset tiktok", "self mastery tiktok"],
+        "instagram_keywords": ["dark psychology reels", "stoic quotes instagram", "psychology reels"],
+        "youtube_category_ids": [22, 27],
+        "youtube_keywords": ["dark psychology", "stoic mindset", "self mastery"],
+        "snapchat_keywords": ["dark psychology snapchat", "motivation spotlight", "psychology snap"]
       },
       "sister_brands": ["wealth_success_guru", "zen_success_guru", "habits_success_guru"],
       "review_email": "review.human@successgurunetwork.com",
@@ -106,7 +111,12 @@
       "trend_sources": {
         "subreddits": ["financialindependence", "investing", "personalfinance", "fatFIRE", "Bogleheads"],
         "news_keywords": ["wealth building", "investment strategy", "financial psychology"],
-        "google_trends_keywords": ["passive income", "financial freedom", "wealth building"]
+        "google_trends_keywords": ["passive income", "financial freedom", "wealth building"],
+        "tiktok_keywords": ["passive income tiktok", "wealth building tiktok", "money mindset tiktok"],
+        "instagram_keywords": ["wealth building reels", "financial freedom instagram", "money mindset reels"],
+        "youtube_category_ids": [22, 27],
+        "youtube_keywords": ["passive income", "financial freedom", "wealth building"],
+        "snapchat_keywords": ["passive income snapchat", "wealth tips spotlight", "money mindset snap"]
       },
       "sister_brands": ["human_success_guru", "habits_success_guru", "social_success_guru"],
       "review_email": "review.wealth@successgurunetwork.com",
@@ -161,7 +171,12 @@
       "trend_sources": {
         "subreddits": ["stoicism", "meditation", "Mindfulness", "philosophy", "zen"],
         "news_keywords": ["mindfulness research", "stoic philosophy", "mental wellness"],
-        "google_trends_keywords": ["stoicism", "inner peace", "mindfulness practice"]
+        "google_trends_keywords": ["stoicism", "inner peace", "mindfulness practice"],
+        "tiktok_keywords": ["stoicism tiktok", "inner peace tiktok", "mindfulness tiktok"],
+        "instagram_keywords": ["stoic quotes reels", "mindfulness instagram", "inner peace reels"],
+        "youtube_category_ids": [22, 27],
+        "youtube_keywords": ["stoicism", "inner peace", "mindfulness practice"],
+        "snapchat_keywords": ["mindfulness snapchat", "stoic wisdom spotlight", "inner peace snap"]
       },
       "sister_brands": ["human_success_guru", "habits_success_guru", "relationships_success_guru"],
       "review_email": "review.zen@successgurunetwork.com",
@@ -216,7 +231,12 @@
       "trend_sources": {
         "subreddits": ["socialskills", "communication", "confidence", "networking", "charisma"],
         "news_keywords": ["social intelligence", "communication skills", "body language"],
-        "google_trends_keywords": ["charisma tips", "social skills", "how to read people"]
+        "google_trends_keywords": ["charisma tips", "social skills", "how to read people"],
+        "tiktok_keywords": ["charisma tips tiktok", "social skills tiktok", "body language tiktok"],
+        "instagram_keywords": ["charisma reels", "social skills instagram", "communication reels"],
+        "youtube_category_ids": [22, 24, 27],
+        "youtube_keywords": ["charisma tips", "social skills", "how to read people"],
+        "snapchat_keywords": ["social skills snapchat", "charisma spotlight", "body language snap"]
       },
       "sister_brands": ["wealth_success_guru", "relationships_success_guru", "human_success_guru"],
       "review_email": "review.social@successgurunetwork.com",
@@ -271,7 +291,12 @@
       "trend_sources": {
         "subreddits": ["getdisciplined", "productivity", "habits", "theXeffect", "DecidingToBeBetter"],
         "news_keywords": ["habit formation", "productivity science", "routine optimization"],
-        "google_trends_keywords": ["morning routine", "habit building", "daily discipline"]
+        "google_trends_keywords": ["morning routine", "habit building", "daily discipline"],
+        "tiktok_keywords": ["morning routine tiktok", "habit building tiktok", "productivity tiktok"],
+        "instagram_keywords": ["morning routine reels", "habit building instagram", "productivity reels"],
+        "youtube_category_ids": [22, 26, 27],
+        "youtube_keywords": ["morning routine", "habit building", "daily discipline"],
+        "snapchat_keywords": ["morning routine snapchat", "productivity spotlight", "habits snap"]
       },
       "sister_brands": ["human_success_guru", "zen_success_guru", "wealth_success_guru"],
       "review_email": "review.habits@successgurunetwork.com",
@@ -326,7 +351,12 @@
       "trend_sources": {
         "subreddits": ["relationship_advice", "attachment_theory", "emotionalintelligence", "datingadvice", "selfimprovement"],
         "news_keywords": ["relationship psychology", "attachment theory", "emotional intelligence"],
-        "google_trends_keywords": ["attachment style", "healthy relationships", "emotional intelligence"]
+        "google_trends_keywords": ["attachment style", "healthy relationships", "emotional intelligence"],
+        "tiktok_keywords": ["attachment style tiktok", "relationship psychology tiktok", "emotional intelligence tiktok"],
+        "instagram_keywords": ["relationship advice reels", "attachment theory instagram", "love language reels"],
+        "youtube_category_ids": [22, 27],
+        "youtube_keywords": ["attachment style", "healthy relationships", "emotional intelligence"],
+        "snapchat_keywords": ["relationship advice snapchat", "love psychology spotlight", "attachment snap"]
       },
       "sister_brands": ["zen_success_guru", "social_success_guru", "human_success_guru"],
       "review_email": "review.relationships@successgurunetwork.com",
