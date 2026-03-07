@@ -2,8 +2,8 @@
 Full pipeline test — generate one video per brand.
 
 Runs: Script → TTS → B-roll → Captions → Video Assembly → Telegram notification
-for all 6 brands. B-roll clips are fetched with varied search terms and
-concatenated into a seamless background to avoid repetition.
+for all 6 brands. B-roll clips are fetched directly from Pexels with varied
+search terms and concatenated into a seamless background.
 """
 
 import asyncio
@@ -23,7 +23,6 @@ from database.db import Database
 from modules.ai_brain.llm_router import LLMRouter
 from modules.ai_brain.script_writer import ScriptWriter
 from modules.content_forge.tts_engine import TTSEngine
-from modules.content_forge.broll_fetcher import BRollFetcher
 from modules.content_forge.caption_generator import CaptionGenerator
 from modules.content_forge.video_assembler import VideoAssembler
 
@@ -47,40 +46,99 @@ TOPICS = {
 # Multiple varied search terms per brand for diverse b-roll
 BROLL_SEARCHES = {
     "human_success_guru": ["dark motivation", "person thinking alone", "chess strategy", "city night lights", "man walking determined"],
-    "wealth_success_guru": ["money growth", "stock market", "luxury lifestyle", "business meeting", "gold coins"],
-    "zen_success_guru": ["meditation peaceful", "zen garden stones", "mountain sunrise", "calm ocean waves", "forest path"],
-    "social_success_guru": ["people talking", "body language", "confident speaker", "crowd gathering", "eye contact"],
-    "habits_success_guru": ["morning routine", "workout discipline", "writing journal", "alarm clock sunrise", "healthy breakfast"],
-    "relationships_success_guru": ["couple conversation", "emotional connection", "family together", "holding hands", "deep conversation"],
+    "wealth_success_guru": ["money growth", "stock market trading", "luxury car", "business office", "gold coins wealth"],
+    "zen_success_guru": ["meditation peaceful", "zen garden stones", "mountain sunrise", "calm ocean waves", "forest path nature"],
+    "social_success_guru": ["people conversation", "body language", "confident public speaker", "networking event", "eye contact close"],
+    "habits_success_guru": ["morning routine workout", "writing in journal", "alarm clock sunrise", "healthy food prep", "running exercise"],
+    "relationships_success_guru": ["couple talking sunset", "emotional connection", "family dinner together", "friends laughing", "deep conversation cafe"],
 }
 
-# Stub rate limiter for b-roll fetcher
-class StubRateLimiter:
-    async def acquire(self, *a, **kw):
-        return True
-    async def check_limit(self, *a, **kw):
-        return True
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Direct Pexels fetcher (bypasses cache for unique clips)
 # ---------------------------------------------------------------------------
+
+def fetch_pexels_clip(query: str, brand_id: str, clip_index: int) -> str:
+    """Fetch a single clip directly from Pexels API. Returns local file path."""
+    import requests
+
+    api_key = os.getenv("PEXELS_API_KEY", "")
+    if not api_key:
+        return ""
+
+    headers = {"Authorization": api_key}
+    params = {
+        "query": query,
+        "orientation": "portrait",
+        "per_page": 5,
+        "page": 1,
+    }
+
+    try:
+        resp = requests.get(
+            "https://api.pexels.com/videos/search",
+            headers=headers, params=params, timeout=15,
+        )
+        if resp.status_code != 200:
+            print(f"    [WARN] Pexels API error {resp.status_code} for '{query}'")
+            return ""
+
+        data = resp.json()
+        videos = data.get("videos", [])
+        if not videos:
+            print(f"    [WARN] No Pexels results for '{query}'")
+            return ""
+
+        # Pick a random video from results to add variety
+        import random
+        video = random.choice(videos)
+        video_files = video.get("video_files", [])
+
+        # Pick best quality portrait file (prefer HD)
+        best = None
+        for vf in video_files:
+            w = vf.get("width", 0)
+            h = vf.get("height", 0)
+            if h > w:  # portrait
+                if best is None or vf.get("height", 0) > best.get("height", 0):
+                    best = vf
+        if not best and video_files:
+            best = video_files[0]
+
+        if not best or not best.get("link"):
+            return ""
+
+        # Download
+        dl_dir = f"/app/media/{brand_id}/broll_fresh"
+        os.makedirs(dl_dir, exist_ok=True)
+        out_path = os.path.join(dl_dir, f"clip_{clip_index}_{video['id']}.mp4")
+
+        if os.path.exists(out_path):
+            return out_path
+
+        print(f"    Downloading: '{query}' → {video['id']} ({best.get('width')}x{best.get('height')})")
+        dl_resp = requests.get(best["link"], timeout=60, stream=True)
+        if dl_resp.status_code == 200:
+            with open(out_path, "wb") as f:
+                for chunk in dl_resp.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            return out_path
+        return ""
+
+    except Exception as e:
+        print(f"    [WARN] Pexels fetch error for '{query}': {e}")
+        return ""
+
 
 def concatenate_broll(clip_paths: list, output_path: str, target_duration: float) -> str:
-    """Concatenate multiple b-roll clips into one seamless background video.
-
-    Scales all clips to 1080x1920 portrait, concatenates them, and trims
-    to target_duration. If clips are shorter than needed, the last clip
-    is looped to fill the gap.
-    """
+    """Concatenate multiple b-roll clips into one seamless background video."""
     if not clip_paths:
         return ""
 
-    # Create a temp file listing all clips for FFmpeg concat
     list_dir = os.path.dirname(output_path)
     os.makedirs(list_dir, exist_ok=True)
-    list_file = os.path.join(list_dir, "concat_list.txt")
 
-    # First, scale each clip to 1080x1920 and re-encode for compatibility
+    # Scale each clip to 1080x1920 portrait
     scaled_clips = []
     for i, clip in enumerate(clip_paths):
         scaled = os.path.join(list_dir, f"scaled_{i}.mp4")
@@ -89,7 +147,7 @@ def concatenate_broll(clip_paths: list, output_path: str, target_duration: float
             "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,"
                    "pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1",
             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-r", "30", "-an", "-t", "15",
+            "-r", "30", "-an", "-t", "12",
             scaled,
         ]
         try:
@@ -102,16 +160,13 @@ def concatenate_broll(clip_paths: list, output_path: str, target_duration: float
     if not scaled_clips:
         return ""
 
-    # Write concat list — repeat clips if needed to fill duration
-    total_clip_duration = len(scaled_clips) * 10  # estimate ~10s each
-    repeats = max(int(target_duration / max(total_clip_duration, 1)) + 1, 1)
-
+    # Write concat list
+    list_file = os.path.join(list_dir, "concat_list.txt")
     with open(list_file, "w") as f:
-        for _ in range(repeats):
-            for sc in scaled_clips:
-                f.write(f"file '{sc}'\n")
+        for sc in scaled_clips:
+            f.write(f"file '{sc}'\n")
 
-    # Concatenate and trim to target duration
+    # Concatenate
     cmd = [
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
         "-i", list_file,
@@ -122,8 +177,8 @@ def concatenate_broll(clip_paths: list, output_path: str, target_duration: float
     try:
         subprocess.run(cmd, check=True, capture_output=True, timeout=180)
         return output_path
-    except Exception as e:
-        print(f"    [WARN] Concatenation failed: {e}")
+    except subprocess.CalledProcessError as e:
+        print(f"    [WARN] Concat failed: {e.stderr[:300] if e.stderr else e}")
         return scaled_clips[0] if scaled_clips else ""
 
 
@@ -203,32 +258,23 @@ async def run_brand_pipeline(brand_id: str, topic: str):
     vo_duration = tts_result.duration_seconds
     print(f"  [OK] Audio: {audio_path} ({vo_duration:.1f}s) ({time.time()-t0:.1f}s)")
 
-    # --- Step 3: B-Roll — fetch multiple clips with varied searches ---
-    print(f"\n  [3/5] Fetching b-roll clips (varied searches)...")
+    # --- Step 3: B-Roll — fetch directly from Pexels (no cache) ---
+    print(f"\n  [3/5] Fetching b-roll clips (5 unique searches)...")
     t0 = time.time()
-    broll_fetcher = BRollFetcher(
-        db=db,
-        rate_limiter=StubRateLimiter(),
-        pexels_api_key=os.getenv("PEXELS_API_KEY", ""),
-        pixabay_api_key=os.getenv("PIXABAY_API_KEY", ""),
-    )
+
+    # Clear previous fresh clips for this brand
+    fresh_dir = f"/app/media/{brand_id}/broll_fresh"
+    if os.path.exists(fresh_dir):
+        for f in os.listdir(fresh_dir):
+            if f.startswith("clip_") or f.startswith("scaled_"):
+                os.remove(os.path.join(fresh_dir, f))
 
     all_broll_paths = []
     search_terms = BROLL_SEARCHES.get(brand_id, [topic[:30]])
-    for search_term in search_terms:
-        try:
-            clips = await broll_fetcher.fetch_broll(
-                brand_id=brand_id,
-                theme=search_term,
-                duration_seconds=12.0,
-                count=1,
-            )
-            if isinstance(clips, list):
-                for p in clips:
-                    if p and isinstance(p, str) and os.path.exists(p):
-                        all_broll_paths.append(p)
-        except Exception as e:
-            print(f"    [WARN] B-roll '{search_term}': {e}")
+    for i, search_term in enumerate(search_terms):
+        path = fetch_pexels_clip(search_term, brand_id, i)
+        if path and os.path.exists(path):
+            all_broll_paths.append(path)
 
     print(f"  [OK] B-roll: {len(all_broll_paths)} unique clips ({time.time()-t0:.1f}s)")
 
@@ -239,7 +285,7 @@ async def run_brand_pipeline(brand_id: str, topic: str):
     bg_path = os.path.join(bg_dir, "bg_concat.mp4")
 
     if all_broll_paths:
-        print(f"  [3b] Concatenating {len(all_broll_paths)} clips into background...")
+        print(f"  [3b] Concatenating {len(all_broll_paths)} clips → {target_duration:.0f}s background...")
         bg_path = concatenate_broll(all_broll_paths, bg_path, target_duration)
         if not bg_path:
             print(f"  [WARN] Concat failed, using solid color fallback")
@@ -252,6 +298,7 @@ async def run_brand_pipeline(brand_id: str, topic: str):
             ], capture_output=True, timeout=30)
     else:
         print(f"  [WARN] No b-roll clips, using solid color background")
+        bg_path = os.path.join(bg_dir, "bg_solid.mp4")
         subprocess.run([
             "ffmpeg", "-y", "-f", "lavfi",
             "-i", "color=c=0x1a1a2e:s=1080x1920:d=60",
