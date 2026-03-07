@@ -115,6 +115,9 @@ class Database:
         """
         return self.pool.write_with_lock(sql, params)
 
+    # Alias for compatibility — many modules use execute_write
+    execute_write = write
+
     def insert(self, table: str, data: dict) -> int:
         """
         Inserts a row into a table and returns the new row ID.
