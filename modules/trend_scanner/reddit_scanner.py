@@ -46,7 +46,7 @@ class RedditScanner(BaseScanner):
     BASE_URL: str = "https://www.reddit.com"
     POSTS_PER_SUBREDDIT: int = 25
     MIN_UPVOTES: int = 50
-    USER_AGENT: str = "AutoFarm/6.0 (Content Research Bot)"
+    USER_AGENT: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
     REQUEST_DELAY: float = 2.0  # Reddit rate limit: 60 req/min
 
     def __init__(self) -> None:
