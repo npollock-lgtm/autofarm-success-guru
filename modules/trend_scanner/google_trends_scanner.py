@@ -155,6 +155,22 @@ class GoogleTrendsScanner(BaseScanner):
         Side effects:
             Makes HTTP requests to Google Trends.
         """
+        # pytrends may pass deprecated 'method_whitelist' to urllib3.Retry
+        # which was renamed to 'allowed_methods' in urllib3 2.0+.
+        # Patch urllib3.Retry to accept the old parameter name.
+        try:
+            from urllib3.util.retry import Retry as _OrigRetry
+            _orig_init = _OrigRetry.__init__
+
+            def _patched_init(self_retry, *args, **kwargs):
+                if 'method_whitelist' in kwargs:
+                    kwargs['allowed_methods'] = kwargs.pop('method_whitelist')
+                return _orig_init(self_retry, *args, **kwargs)
+
+            _OrigRetry.__init__ = _patched_init
+        except Exception:
+            pass
+
         pytrends = self._TrendReq(
             hl='en-US',
             tz=0,

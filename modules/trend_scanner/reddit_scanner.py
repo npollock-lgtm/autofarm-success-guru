@@ -56,6 +56,7 @@ class RedditScanner(BaseScanner):
         Side effects:
             Creates an HTTP session with appropriate headers.
             Initializes rate limit manager.
+            Configures Squid proxy if available (Reddit blocks cloud IPs).
         """
         super().__init__()
         self.session = requests.Session()
@@ -63,6 +64,17 @@ class RedditScanner(BaseScanner):
             'User-Agent': self.USER_AGENT,
             'Accept': 'application/json',
         })
+
+        # Reddit blocks cloud provider IPs (OCI, AWS, GCP).
+        # Route through Squid proxy on proxy VM for a residential-like IP.
+        proxy_ip = os.getenv("PROXY_VM_INTERNAL_IP", "10.0.2.112")
+        proxy_port = os.getenv("REDDIT_PROXY_PORT", "3128")
+        proxy_url = f"http://{proxy_ip}:{proxy_port}"
+        self.session.proxies = {
+            'http': proxy_url,
+            'https': proxy_url,
+        }
+
         self._rate_limiter = RateLimitManager()
 
     def scan(self, brand_id: str, brand_config: dict) -> list[TrendItem]:
