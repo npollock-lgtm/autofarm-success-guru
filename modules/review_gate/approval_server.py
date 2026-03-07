@@ -447,7 +447,24 @@ document.getElementById('hd').innerHTML='<pre>'+JSON.stringify(d,null,2)+'</pre>
 
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv("/app/.env")
+
     from database.db import Database
+    from modules.review_gate.approval_tracker import ApprovalTracker
+    from modules.review_gate.gate import ReviewGate
+    from modules.review_gate.telegram_reviewer import TelegramReviewer
+
     db = Database()
-    server = ApprovalServer(db=db)
-    server.start()
+    tracker = ApprovalTracker(db=db)
+    telegram_reviewer = TelegramReviewer()  # reads token/chat_id from env
+    gate = ReviewGate(
+        db=db,
+        approval_tracker=tracker,
+        telegram_reviewer=telegram_reviewer,
+    )
+    server = ApprovalServer(
+        db=db, approval_tracker=tracker, review_gate=gate
+    )
+    server.run()
