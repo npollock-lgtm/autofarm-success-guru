@@ -487,9 +487,9 @@ class VideoAssembler:
             vf_parts.append(
                 f"subtitles='{srt_escaped}':force_style="
                 "'Alignment=2,FontName=Liberation Sans,Bold=1,"
-                "FontSize=18,PrimaryColour=&H00FFFFFF,"
+                "FontSize=22,PrimaryColour=&H00FFFFFF,"
                 "OutlineColour=&H00000000,Outline=2,"
-                "Shadow=1,ShadowColour=&H80000000,MarginV=60'"
+                "Shadow=1,ShadowColour=&H80000000,MarginV=70'"
             )
 
         vf_str = ",".join(vf_parts) if vf_parts else None
