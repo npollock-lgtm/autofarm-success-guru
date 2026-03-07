@@ -291,38 +291,137 @@ def compress_for_telegram(video_path: str, max_size_mb: float = 45.0) -> str:
         return video_path
 
 
-def send_to_telegram(video_path: str, brand_id: str, script_text: str):
-    """Send completed video to Telegram."""
+def send_via_proxy(video_path: str, brand_id: str, script_text: str) -> bool:
+    """Forward video to proxy VM for Telegram/email delivery.
+
+    The content VM has slow NAT-based internet. The proxy VM has a direct
+    public IP with faster upload. This function:
+    1. SCPs the video to the proxy VM /tmp/
+    2. SSHs to proxy and runs send_video.py (Telegram + Gmail fallback)
+    3. Cleans up the temp file on proxy
+
+    Falls back to direct send if proxy forwarding fails.
+
+    Parameters
+    ----------
+    video_path : str
+        Path to the generated video.
+    brand_id : str
+        Brand identifier.
+    script_text : str
+        Script content for caption.
+
+    Returns
+    -------
+    bool
+        True if sent via any method.
+    """
+    proxy_ip = os.getenv("PROXY_VM_INTERNAL_IP", "10.0.2.112")
+    filename = os.path.basename(video_path)
+    remote_path = f"/tmp/{filename}"
+
+    # Compress locally first if needed
+    send_path = compress_for_telegram(video_path)
+    send_filename = os.path.basename(send_path)
+    remote_send_path = f"/tmp/{send_filename}"
+
+    # Step 1: SCP video to proxy VM
+    print(f"  [proxy] Copying to proxy VM ({proxy_ip})...")
+    scp_cmd = [
+        "scp", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
+        send_path, f"opc@{proxy_ip}:{remote_send_path}",
+    ]
+    try:
+        result = subprocess.run(scp_cmd, capture_output=True, timeout=120, text=True)
+        if result.returncode != 0:
+            print(f"  [proxy] SCP failed: {result.stderr[:200]}")
+            return send_direct_fallback(send_path, brand_id, script_text)
+    except Exception as e:
+        print(f"  [proxy] SCP error: {e}")
+        return send_direct_fallback(send_path, brand_id, script_text)
+
+    print(f"  [proxy] SCP done, triggering send_video.py on proxy...")
+
+    # Step 2: SSH to proxy and run send_video.py
+    # Escape the caption for shell (single quotes with escaping)
+    safe_caption = script_text[:800].replace("'", "'\\''")
+    ssh_cmd = [
+        "ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
+        f"opc@{proxy_ip}",
+        f"cd /app && source .venv/bin/activate && "
+        f"PYTHONPATH=/app python scripts/send_video.py "
+        f"'{remote_send_path}' '{brand_id}' '{safe_caption}'"
+    ]
+    try:
+        result = subprocess.run(ssh_cmd, capture_output=True, timeout=360, text=True)
+        print(result.stdout)
+        if result.stderr:
+            print(f"  [proxy] stderr: {result.stderr[:300]}")
+
+        # Cleanup temp file on proxy
+        subprocess.run(
+            ["ssh", "-o", "StrictHostKeyChecking=no", f"opc@{proxy_ip}",
+             f"rm -f {remote_send_path}"],
+            capture_output=True, timeout=10,
+        )
+
+        if result.returncode == 0:
+            print(f"  [OK] Sent via proxy")
+            return True
+        else:
+            print(f"  [proxy] send_video.py returned error")
+            return False
+
+    except Exception as e:
+        print(f"  [proxy] SSH error: {e}")
+        return send_direct_fallback(send_path, brand_id, script_text)
+
+
+def send_direct_fallback(video_path: str, brand_id: str, script_text: str) -> bool:
+    """Direct Telegram send from content VM (last resort).
+
+    Parameters
+    ----------
+    video_path : str
+        Path to video file.
+    brand_id : str
+        Brand identifier.
+    script_text : str
+        Script content for caption.
+
+    Returns
+    -------
+    bool
+        True if sent successfully.
+    """
     import requests
 
+    print(f"  [fallback] Trying direct Telegram send from content VM...")
     bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
     chat_id = os.getenv("TELEGRAM_REVIEW_CHAT_ID", "")
     if not bot_token or not chat_id:
-        print(f"  [!] Telegram not configured, skipping send")
+        print(f"  [fallback] Telegram not configured")
         return False
-
-    # Compress if over 45MB
-    send_path = compress_for_telegram(video_path)
 
     caption = f"Brand: {brand_id}\n\n{script_text[:800]}"
     url = f"https://api.telegram.org/bot{bot_token}/sendVideo"
 
     try:
-        with open(send_path, "rb") as vf:
+        with open(video_path, "rb") as vf:
             resp = requests.post(
                 url,
                 data={"chat_id": chat_id, "caption": caption, "parse_mode": "HTML"},
-                files={"video": (os.path.basename(send_path), vf, "video/mp4")},
-                timeout=180,
+                files={"video": (os.path.basename(video_path), vf, "video/mp4")},
+                timeout=300,
             )
         if resp.status_code == 200:
-            print(f"  [OK] Sent to Telegram")
+            print(f"  [fallback] Sent to Telegram directly")
             return True
         else:
-            print(f"  [!] Telegram error: {resp.status_code} {resp.text[:200]}")
+            print(f"  [fallback] Telegram error: {resp.status_code} {resp.text[:200]}")
             return False
     except Exception as e:
-        print(f"  [!] Telegram send failed: {e}")
+        print(f"  [fallback] Direct send failed: {e}")
         return False
 
 
@@ -468,9 +567,9 @@ async def run_brand_pipeline(brand_id: str, topic: str, broll_mode: str = "fresh
     size_mb = video_result.get("file_size_mb", 0)
     print(f"  [OK] Video: {video_path} ({duration}s, {size_mb:.1f}MB) ({time.time()-t0:.1f}s)")
 
-    # --- Send to Telegram ---
-    print(f"\n  Sending to Telegram...")
-    send_to_telegram(video_path, brand_id, script_text)
+    # --- Send notification (Telegram via proxy → Gmail fallback) ---
+    print(f"\n  Sending video notification...")
+    send_via_proxy(video_path, brand_id, script_text)
 
     total = time.time() - start
     print(f"\n  TOTAL TIME: {total:.1f}s")

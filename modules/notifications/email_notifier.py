@@ -34,7 +34,7 @@ class EmailNotifier:
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
         self.smtp_user = os.getenv("SMTP_USER", "")
-        self.smtp_pass = os.getenv("SMTP_PASS", "")
+        self.smtp_pass = os.getenv("SMTP_PASSWORD", "") or os.getenv("SMTP_PASS", "")
         self.from_addr = os.getenv("NOTIFY_EMAIL_FROM", self.smtp_user)
         self.to_addr = os.getenv("NOTIFY_EMAIL_TO", "")
 
