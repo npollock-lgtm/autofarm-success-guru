@@ -567,3 +567,18 @@ class TokenRefresher:
                 for a in expiring
             ],
         }
+
+
+if __name__ == "__main__":
+    import time
+
+    refresher = TokenRefresher()
+    logger.info("Token refresher daemon started")
+
+    while True:
+        try:
+            result = refresher.refresh_all_expiring()
+            logger.info("Token refresh cycle complete", extra=result)
+        except Exception as e:
+            logger.error("Token refresh cycle failed: %s", e)
+        time.sleep(1800)  # Run every 30 minutes

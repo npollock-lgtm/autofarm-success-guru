@@ -435,3 +435,24 @@ class TelegramNotifier:
             )
         except Exception as exc:
             logger.error("Failed to log notification: %s", exc)
+
+
+if __name__ == "__main__":
+    import asyncio
+    import time
+    from database.db import Database
+
+    db = Database()
+    notifier = TelegramNotifier(db=db)
+
+    async def run_bot():
+        """Run the Telegram notifier as a long-running daemon."""
+        logger.info("Telegram notifier daemon started")
+        while True:
+            try:
+                await notifier.send_daily_digest()
+            except Exception as e:
+                logger.error("Telegram daemon error: %s", e)
+            await asyncio.sleep(3600)  # Check every hour
+
+    asyncio.run(run_bot())

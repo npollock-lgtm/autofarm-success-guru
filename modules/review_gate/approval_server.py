@@ -444,3 +444,10 @@ document.getElementById('hd').innerHTML='<pre>'+JSON.stringify(d,null,2)+'</pre>
 <h1>Compliance</h1><div class="nav"><a href="/dashboard">← Back</a></div>
 <div class="card"><p>Rate limit status and daily API usage counters.</p></div>"""
         return self._base_html("Compliance", body)
+
+
+if __name__ == "__main__":
+    from database.db import Database
+    db = Database()
+    server = ApprovalServer(db=db)
+    server.start()
