@@ -150,8 +150,11 @@ async def run_brand_pipeline(brand_id: str, topic: str):
         print(f"  [WARN] B-roll fetch error: {e}")
         broll_clips = []
 
-    broll_paths = [c.get("local_path") or c.get("path", "") for c in broll_clips if c]
-    broll_paths = [p for p in broll_paths if p and os.path.exists(p)]
+    # broll_clips is a list of file path strings
+    if isinstance(broll_clips, list):
+        broll_paths = [p for p in broll_clips if p and isinstance(p, str) and os.path.exists(p)]
+    else:
+        broll_paths = []
     print(f"  [OK] B-roll: {len(broll_paths)} clips ({time.time()-t0:.1f}s)")
 
     # --- Step 4: Captions / SRT (sync) ---
