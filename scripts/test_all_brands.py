@@ -5,8 +5,10 @@ Runs: Script → TTS → B-roll → Captions → Video Assembly → Telegram not
 for all 6 brands.
 """
 
+import asyncio
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -80,10 +82,10 @@ def send_to_telegram(video_path: str, brand_id: str, script_text: str):
         return False
 
 # ---------------------------------------------------------------------------
-# Main pipeline
+# Main pipeline (async)
 # ---------------------------------------------------------------------------
 
-def run_brand_pipeline(brand_id: str, topic: str):
+async def run_brand_pipeline(brand_id: str, topic: str):
     """Run the full content pipeline for one brand."""
     print(f"\n{'='*60}")
     print(f"  BRAND: {brand_id}")
@@ -93,7 +95,7 @@ def run_brand_pipeline(brand_id: str, topic: str):
     brand_config = BRANDS.get(brand_id, {})
     start = time.time()
 
-    # --- Step 1: Script Generation ---
+    # --- Step 1: Script Generation (sync) ---
     print(f"\n  [1/5] Generating script...")
     t0 = time.time()
     db = Database()
@@ -111,12 +113,12 @@ def run_brand_pipeline(brand_id: str, topic: str):
     script_text = result["script_text"]
     print(f"  [OK] Script: {len(script_text)} chars, {result.get('word_count', '?')} words ({time.time()-t0:.1f}s)")
 
-    # --- Step 2: TTS (Voiceover) ---
+    # --- Step 2: TTS / Voiceover (async) ---
     print(f"\n  [2/5] Generating voiceover (Kokoro TTS)...")
     t0 = time.time()
     tts = TTSEngine()
     os.makedirs(f"/app/media/{brand_id}/audio", exist_ok=True)
-    tts_result = tts.generate_voiceover(
+    tts_result = await tts.generate_voiceover(
         script_text=script_text,
         brand_id=brand_id,
     )
@@ -127,7 +129,7 @@ def run_brand_pipeline(brand_id: str, topic: str):
     word_timestamps = tts_result.get("word_timestamps", [])
     print(f"  [OK] Audio: {audio_path} ({time.time()-t0:.1f}s)")
 
-    # --- Step 3: B-Roll ---
+    # --- Step 3: B-Roll (async) ---
     print(f"\n  [3/5] Fetching b-roll clips...")
     t0 = time.time()
     broll_fetcher = BRollFetcher(
@@ -136,30 +138,23 @@ def run_brand_pipeline(brand_id: str, topic: str):
         pexels_api_key=os.getenv("PEXELS_API_KEY", ""),
         pixabay_api_key=os.getenv("PIXABAY_API_KEY", ""),
     )
-    # Pick a search theme from the topic
     theme = topic.split(":")[0] if ":" in topic else topic[:40]
-    import asyncio
-    loop = asyncio.new_event_loop()
     try:
-        broll_clips = loop.run_until_complete(
-            broll_fetcher.fetch_broll(
-                brand_id=brand_id,
-                theme=theme,
-                duration_seconds=15.0,
-                count=2,
-            )
+        broll_clips = await broll_fetcher.fetch_broll(
+            brand_id=brand_id,
+            theme=theme,
+            duration_seconds=15.0,
+            count=2,
         )
     except Exception as e:
         print(f"  [WARN] B-roll fetch error: {e}")
         broll_clips = []
-    finally:
-        loop.close()
 
     broll_paths = [c.get("local_path") or c.get("path", "") for c in broll_clips if c]
     broll_paths = [p for p in broll_paths if p and os.path.exists(p)]
     print(f"  [OK] B-roll: {len(broll_paths)} clips ({time.time()-t0:.1f}s)")
 
-    # --- Step 4: Captions (SRT) ---
+    # --- Step 4: Captions / SRT (sync) ---
     print(f"\n  [4/5] Generating subtitles...")
     t0 = time.time()
     captions_srt = None
@@ -177,7 +172,7 @@ def run_brand_pipeline(brand_id: str, topic: str):
     else:
         print(f"  [WARN] No word timestamps from TTS, skipping captions")
 
-    # --- Step 5: Video Assembly ---
+    # --- Step 5: Video Assembly (async) ---
     print(f"\n  [5/5] Assembling video...")
     t0 = time.time()
     assembler = VideoAssembler()
@@ -186,7 +181,6 @@ def run_brand_pipeline(brand_id: str, topic: str):
     # Create a solid color background as base if no b-roll
     bg_path = f"/app/media/{brand_id}/bg_temp.mp4"
     if not broll_paths:
-        import subprocess
         subprocess.run([
             "ffmpeg", "-y", "-f", "lavfi",
             "-i", "color=c=0x1a1a2e:s=1080x1920:d=60",
@@ -196,7 +190,7 @@ def run_brand_pipeline(brand_id: str, topic: str):
     else:
         bg_path = broll_paths[0]
 
-    video_result = assembler.assemble_video(
+    video_result = await assembler.assemble_video(
         brand_id=brand_id,
         background_path=bg_path,
         voiceover_path=audio_path,
@@ -226,7 +220,7 @@ def run_brand_pipeline(brand_id: str, topic: str):
 # Run all brands
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
+async def main():
     print("\n" + "#"*60)
     print("  AUTOFARM V6 — FULL PIPELINE TEST (ALL 6 BRANDS)")
     print("#"*60)
@@ -234,7 +228,7 @@ if __name__ == "__main__":
     results = {}
     for brand_id, topic in TOPICS.items():
         try:
-            success = run_brand_pipeline(brand_id, topic)
+            success = await run_brand_pipeline(brand_id, topic)
             results[brand_id] = "PASS" if success else "FAIL"
         except Exception as e:
             print(f"\n  [ERROR] {brand_id}: {e}")
@@ -253,3 +247,7 @@ if __name__ == "__main__":
     passed = sum(1 for s in results.values() if s == "PASS")
     print(f"\n  {passed}/6 brands completed successfully")
     print("#"*60)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
