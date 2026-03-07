@@ -317,6 +317,7 @@ def send_via_proxy(video_path: str, brand_id: str, script_text: str) -> bool:
         True if sent via any method.
     """
     proxy_ip = os.getenv("PROXY_VM_INTERNAL_IP", "10.0.2.112")
+    proxy_user = os.getenv("PROXY_VM_USER", "ubuntu")
     filename = os.path.basename(video_path)
     remote_path = f"/tmp/{filename}"
 
@@ -326,10 +327,10 @@ def send_via_proxy(video_path: str, brand_id: str, script_text: str) -> bool:
     remote_send_path = f"/tmp/{send_filename}"
 
     # Step 1: SCP video to proxy VM
-    print(f"  [proxy] Copying to proxy VM ({proxy_ip})...")
+    print(f"  [proxy] Copying to proxy VM ({proxy_user}@{proxy_ip})...")
     scp_cmd = [
         "scp", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
-        send_path, f"opc@{proxy_ip}:{remote_send_path}",
+        send_path, f"{proxy_user}@{proxy_ip}:{remote_send_path}",
     ]
     try:
         result = subprocess.run(scp_cmd, capture_output=True, timeout=120, text=True)
@@ -347,7 +348,7 @@ def send_via_proxy(video_path: str, brand_id: str, script_text: str) -> bool:
     safe_caption = script_text[:800].replace("'", "'\\''")
     ssh_cmd = [
         "ssh", "-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=10",
-        f"opc@{proxy_ip}",
+        f"{proxy_user}@{proxy_ip}",
         f"cd /app && source .venv/bin/activate && "
         f"PYTHONPATH=/app python scripts/send_video.py "
         f"'{remote_send_path}' '{brand_id}' '{safe_caption}'"
@@ -360,7 +361,7 @@ def send_via_proxy(video_path: str, brand_id: str, script_text: str) -> bool:
 
         # Cleanup temp file on proxy
         subprocess.run(
-            ["ssh", "-o", "StrictHostKeyChecking=no", f"opc@{proxy_ip}",
+            ["ssh", "-o", "StrictHostKeyChecking=no", f"{proxy_user}@{proxy_ip}",
              f"rm -f {remote_send_path}"],
             capture_output=True, timeout=10,
         )
