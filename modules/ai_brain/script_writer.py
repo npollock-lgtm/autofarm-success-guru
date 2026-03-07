@@ -111,6 +111,10 @@ class ScriptWriter:
                     f"{body_result['body']}\n\n"
                     f"{cta}"
                 )
+
+                # Spell-check: fix misspelled words
+                script_text = self._fix_spelling(script_text)
+
                 word_count = len(script_text.split())
 
                 # Check cross-brand deduplication
@@ -297,6 +301,66 @@ class ScriptWriter:
                 best_pillar = pillar
 
         return best_pillar
+
+    def _fix_spelling(self, text: str) -> str:
+        """
+        Fix misspelled words in the generated script.
+
+        Uses spellchecker to detect and auto-correct misspelled words.
+        Only corrects words with high-confidence single corrections.
+
+        Parameters:
+            text: Raw script text from LLM.
+
+        Returns:
+            Spell-checked script text.
+        """
+        try:
+            from spellchecker import SpellChecker
+            spell = SpellChecker()
+
+            # Split into lines to preserve formatting
+            lines = text.split('\n')
+            fixed_lines = []
+
+            for line in lines:
+                words = line.split()
+                fixed_words = []
+                for word in words:
+                    # Strip punctuation for checking
+                    stripped = word.strip('.,!?;:"\'-()[]{}')
+                    if not stripped or len(stripped) < 3:
+                        fixed_words.append(word)
+                        continue
+
+                    # Skip capitalised proper nouns, acronyms, numbers
+                    if stripped[0].isupper() or stripped.isupper() or any(c.isdigit() for c in stripped):
+                        fixed_words.append(word)
+                        continue
+
+                    if stripped.lower() in spell:
+                        fixed_words.append(word)
+                    else:
+                        correction = spell.correction(stripped.lower())
+                        if correction and correction != stripped.lower():
+                            # Preserve original casing and punctuation
+                            fixed = word.replace(stripped, correction)
+                            logger.info("spell_correction",
+                                        original=stripped, corrected=correction)
+                            fixed_words.append(fixed)
+                        else:
+                            fixed_words.append(word)
+
+                fixed_lines.append(' '.join(fixed_words))
+
+            return '\n'.join(fixed_lines)
+
+        except ImportError:
+            logger.warning("spellchecker not installed, skipping spell check")
+            return text
+        except Exception as e:
+            logger.warning("spell_check_failed: %s", e)
+            return text
 
     def _store_script(self, script_data: dict) -> int:
         """
