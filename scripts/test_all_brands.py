@@ -2,13 +2,21 @@
 Full pipeline test — generate one video per brand.
 
 Runs: Script → TTS → B-roll → Captions → Video Assembly → Telegram notification
-for all 6 brands. B-roll clips are fetched directly from Pexels with varied
-search terms and concatenated into a seamless background.
+for all 6 brands.
+
+B-roll mode (set via BROLL_MODE env var or --mode flag):
+  * "fresh"  — fetch new clips from Pexels each time (default)
+  * "cached" — use pre-built backgrounds from media/<brand>/backgrounds/,
+               matched to script content by keyword similarity
+
+Pre-build backgrounds with:  python scripts/prebuild_backgrounds.py
 """
 
 import asyncio
+import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -52,6 +60,81 @@ BROLL_SEARCHES = {
     "habits_success_guru": ["morning routine workout", "writing in journal", "alarm clock sunrise", "healthy food prep", "running exercise"],
     "relationships_success_guru": ["couple talking sunset", "emotional connection", "family dinner together", "friends laughing", "deep conversation cafe"],
 }
+
+
+# ---------------------------------------------------------------------------
+# Cached background selector
+# ---------------------------------------------------------------------------
+
+def select_best_background(brand_id: str, script_text: str) -> str:
+    """Match a pre-built background to the script using keyword overlap.
+
+    Reads metadata JSONs from media/<brand>/backgrounds/ and scores each
+    background by counting how many of its keywords appear in the script.
+    Returns the path to the best-matching background video, or "" if no
+    cached backgrounds exist.
+    """
+    bg_dir = f"/app/media/{brand_id}/backgrounds"
+    if not os.path.isdir(bg_dir):
+        print(f"    [cache] No backgrounds dir for {brand_id}")
+        return ""
+
+    meta_files = glob.glob(os.path.join(bg_dir, "bg_*.json"))
+    if not meta_files:
+        print(f"    [cache] No cached backgrounds found for {brand_id}")
+        return ""
+
+    # Normalise script to lowercase words for matching
+    script_lower = script_text.lower()
+    script_words = set(re.findall(r"[a-z]+", script_lower))
+
+    best_path = ""
+    best_score = -1
+    best_name = ""
+
+    for meta_file in meta_files:
+        try:
+            with open(meta_file) as f:
+                meta = json.load(f)
+        except Exception:
+            continue
+
+        # Score = number of keyword hits in the script text
+        keywords = meta.get("keywords", [])
+        searches = meta.get("searches", [])
+        score = 0
+
+        # Primary scoring: keyword presence in script
+        for kw in keywords:
+            kw_lower = kw.lower()
+            if kw_lower in script_lower:
+                score += 3  # Direct phrase match worth more
+            elif kw_lower in script_words:
+                score += 2
+
+        # Secondary scoring: search term word overlap
+        for search in searches:
+            search_words = set(search.lower().split())
+            overlap = len(search_words & script_words)
+            score += overlap
+
+        # Determine video path from meta filename
+        video_file = meta_file.replace(".json", ".mp4")
+        if not os.path.exists(video_file):
+            continue
+
+        theme_name = meta.get("theme", "unknown")
+        if score > best_score:
+            best_score = score
+            best_path = video_file
+            best_name = theme_name
+
+    if best_path:
+        print(f"    [cache] Best match: {best_name} (score={best_score})")
+    else:
+        print(f"    [cache] No valid cached backgrounds with video files")
+
+    return best_path
 
 
 # ---------------------------------------------------------------------------
@@ -241,13 +324,13 @@ def send_to_telegram(video_path: str, brand_id: str, script_text: str):
     except Exception as e:
         print(f"  [!] Telegram send failed: {e}")
         return False
-        return False
+
 
 # ---------------------------------------------------------------------------
 # Main pipeline (async)
 # ---------------------------------------------------------------------------
 
-async def run_brand_pipeline(brand_id: str, topic: str):
+async def run_brand_pipeline(brand_id: str, topic: str, broll_mode: str = "fresh"):
     """Run the full content pipeline for one brand."""
     print(f"\n{'='*60}")
     print(f"  BRAND: {brand_id}")
@@ -292,37 +375,52 @@ async def run_brand_pipeline(brand_id: str, topic: str):
     vo_duration = tts_result.duration_seconds
     print(f"  [OK] Audio: {audio_path} ({vo_duration:.1f}s) ({time.time()-t0:.1f}s)")
 
-    # --- Step 3: B-Roll — fetch directly from Pexels (no cache) ---
-    print(f"\n  [3/5] Fetching b-roll clips (5 unique searches)...")
+    # --- Step 3: Background video ---
     t0 = time.time()
-
-    # Clear previous fresh clips for this brand
-    fresh_dir = f"/app/media/{brand_id}/broll_fresh"
-    if os.path.exists(fresh_dir):
-        for f in os.listdir(fresh_dir):
-            if f.startswith("clip_") or f.startswith("scaled_"):
-                os.remove(os.path.join(fresh_dir, f))
-
-    all_broll_paths = []
-    search_terms = BROLL_SEARCHES.get(brand_id, [topic[:30]])
-    for i, search_term in enumerate(search_terms):
-        path = fetch_pexels_clip(search_term, brand_id, i)
-        if path and os.path.exists(path):
-            all_broll_paths.append(path)
-
-    print(f"  [OK] B-roll: {len(all_broll_paths)} unique clips ({time.time()-t0:.1f}s)")
-
-    # --- Concatenate b-roll into seamless background ---
     target_duration = max(vo_duration + 2.0, 30.0)
     bg_dir = f"/app/media/{brand_id}/temp"
     os.makedirs(bg_dir, exist_ok=True)
-    bg_path = os.path.join(bg_dir, "bg_concat.mp4")
+    bg_path = ""
 
-    if all_broll_paths:
-        print(f"  [3b] Concatenating {len(all_broll_paths)} clips → {target_duration:.0f}s background...")
-        bg_path = concatenate_broll(all_broll_paths, bg_path, target_duration)
+    if broll_mode == "cached":
+        # --- CACHED MODE: use pre-built themed backgrounds ---
+        print(f"\n  [3/5] Selecting cached background (mode=cached)...")
+        bg_path = select_best_background(brand_id, script_text)
+        if bg_path:
+            print(f"  [OK] Using cached background: {os.path.basename(bg_path)} ({time.time()-t0:.1f}s)")
+        else:
+            print(f"  [WARN] No cached backgrounds — falling back to fresh fetch")
+            broll_mode = "fresh"  # Fallback
+
+    if broll_mode == "fresh":
+        # --- FRESH MODE: fetch new clips from Pexels each time ---
+        print(f"\n  [3/5] Fetching b-roll clips (mode=fresh, 5 unique searches)...")
+
+        # Clear previous fresh clips for this brand
+        fresh_dir = f"/app/media/{brand_id}/broll_fresh"
+        if os.path.exists(fresh_dir):
+            for f in os.listdir(fresh_dir):
+                if f.startswith("clip_") or f.startswith("scaled_"):
+                    os.remove(os.path.join(fresh_dir, f))
+
+        all_broll_paths = []
+        search_terms = BROLL_SEARCHES.get(brand_id, [topic[:30]])
+        for i, search_term in enumerate(search_terms):
+            path = fetch_pexels_clip(search_term, brand_id, i)
+            if path and os.path.exists(path):
+                all_broll_paths.append(path)
+
+        print(f"  [OK] B-roll: {len(all_broll_paths)} unique clips ({time.time()-t0:.1f}s)")
+
+        # Concatenate into seamless background
+        bg_concat_path = os.path.join(bg_dir, "bg_concat.mp4")
+
+        if all_broll_paths:
+            print(f"  [3b] Concatenating {len(all_broll_paths)} clips → {target_duration:.0f}s background...")
+            bg_path = concatenate_broll(all_broll_paths, bg_concat_path, target_duration)
+
         if not bg_path:
-            print(f"  [WARN] Concat failed, using solid color fallback")
+            print(f"  [WARN] No b-roll available, using solid color fallback")
             bg_path = os.path.join(bg_dir, "bg_solid.mp4")
             subprocess.run([
                 "ffmpeg", "-y", "-f", "lavfi",
@@ -330,15 +428,6 @@ async def run_brand_pipeline(brand_id: str, topic: str):
                 "-c:v", "libx264", "-t", "60", "-pix_fmt", "yuv420p",
                 bg_path
             ], capture_output=True, timeout=30)
-    else:
-        print(f"  [WARN] No b-roll clips, using solid color background")
-        bg_path = os.path.join(bg_dir, "bg_solid.mp4")
-        subprocess.run([
-            "ffmpeg", "-y", "-f", "lavfi",
-            "-i", "color=c=0x1a1a2e:s=1080x1920:d=60",
-            "-c:v", "libx264", "-t", "60", "-pix_fmt", "yuv420p",
-            bg_path
-        ], capture_output=True, timeout=30)
 
     # --- Step 4: Captions / SRT (sync) ---
     print(f"\n  [4/5] Generating subtitles...")
@@ -394,14 +483,38 @@ async def run_brand_pipeline(brand_id: str, topic: str):
 # ---------------------------------------------------------------------------
 
 async def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="AutoFarm V6 Full Pipeline Test")
+    parser.add_argument("--brand", help="Test a single brand only")
+    parser.add_argument(
+        "--mode", choices=["fresh", "cached"], default=None,
+        help="B-roll mode: 'fresh' fetches new clips, 'cached' uses pre-built backgrounds"
+    )
+    args = parser.parse_args()
+
+    # Determine mode: CLI flag > env var > default (fresh)
+    broll_mode = args.mode or os.getenv("BROLL_MODE", "fresh")
+
     print("\n" + "#"*60)
-    print("  AUTOFARM V6 — FULL PIPELINE TEST (ALL 6 BRANDS)")
+    print(f"  AUTOFARM V6 — FULL PIPELINE TEST")
+    print(f"  B-roll mode: {broll_mode}")
     print("#"*60)
 
+    # Select brands to run
+    if args.brand:
+        if args.brand not in TOPICS:
+            print(f"  [ERROR] Unknown brand: {args.brand}")
+            print(f"  Available: {', '.join(TOPICS.keys())}")
+            return
+        brands_to_run = {args.brand: TOPICS[args.brand]}
+    else:
+        brands_to_run = TOPICS
+
     results = {}
-    for brand_id, topic in TOPICS.items():
+    for brand_id, topic in brands_to_run.items():
         try:
-            success = await run_brand_pipeline(brand_id, topic)
+            success = await run_brand_pipeline(brand_id, topic, broll_mode)
             results[brand_id] = "PASS" if success else "FAIL"
         except Exception as e:
             print(f"\n  [ERROR] {brand_id}: {e}")
@@ -410,6 +523,7 @@ async def main():
             results[brand_id] = f"ERROR: {e}"
 
     # --- Summary ---
+    total = len(brands_to_run)
     print("\n\n" + "#"*60)
     print("  RESULTS SUMMARY")
     print("#"*60)
@@ -418,7 +532,8 @@ async def main():
         print(f"  [{icon}] {brand_id}: {status}")
 
     passed = sum(1 for s in results.values() if s == "PASS")
-    print(f"\n  {passed}/6 brands completed successfully")
+    print(f"\n  {passed}/{total} brands completed successfully")
+    print(f"  Mode: {broll_mode}")
     print("#"*60)
 
 
