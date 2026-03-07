@@ -98,7 +98,7 @@ def run_brand_pipeline(brand_id: str, topic: str):
     t0 = time.time()
     db = Database()
     llm = LLMRouter()
-    writer = ScriptWriter(llm_router=llm, db=db)
+    writer = ScriptWriter()
     result = writer.generate_script(
         brand_id=brand_id,
         topic=topic,
